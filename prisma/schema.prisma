@@ -1,0 +1,125 @@
+// Modello dati di StudioFlow Costi: spese, ore e versamenti dei soci per lo sviluppo di StudioFlow.
+// Gli importi sono in centesimi di euro, le ore in minuti.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Socio o collaboratore allo sviluppo. Con nome utente e password può entrare nel programma.
+model Partner {
+  id               String   @id @default(cuid())
+  name             String
+  username         String?  @unique
+  passwordHash     String?
+  isAdmin          Boolean  @default(false)
+  active           Boolean  @default(true)
+  // Quota di partecipazione alle spese, in centesimi di punto (5000 = 50%).
+  shareBasisPoints Int      @default(0)
+  // Costo orario usato per valorizzare le ore di lavoro.
+  hourlyRateCents  Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  sessions        Session[]
+  expensesPaid    Expense[]      @relation("ExpensePaidBy")
+  expensesCreated Expense[]      @relation("ExpenseCreatedBy")
+  timeEntries     TimeEntry[]    @relation("TimeEntryPartner")
+  timeCreated     TimeEntry[]    @relation("TimeEntryCreatedBy")
+  contributions   Contribution[] @relation("ContributionPartner")
+  contribCreated  Contribution[] @relation("ContributionCreatedBy")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  // Hash SHA-256 del valore del cookie: il valore vero resta solo nel browser.
+  tokenHash String   @unique
+  partnerId String
+  partner   Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([partnerId])
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  position Int       @default(0)
+  active   Boolean   @default(true)
+  expenses Expense[]
+}
+
+enum Recurrence {
+  ONE_OFF
+  MONTHLY
+  YEARLY
+}
+
+// Una voce di spesa. Se è ricorrente vale ogni mese (o anno) dalla data di inizio fino alla
+// data di fine, se indicata.
+model Expense {
+  id             String     @id @default(cuid())
+  date           DateTime   @db.Date
+  endDate        DateTime?  @db.Date
+  description    String
+  supplier       String?
+  categoryId     String
+  category       Category   @relation(fields: [categoryId], references: [id])
+  // Importo pagato, IVA inclusa.
+  amountCents    Int
+  // Aliquota IVA in centesimi di punto (2200 = 22%), solo per calcolare l'imponibile.
+  vatBasisPoints Int        @default(0)
+  recurrence     Recurrence @default(ONE_OFF)
+  // Chi l'ha pagata di tasca propria. Vuoto = pagata dalla cassa comune.
+  paidById       String?
+  paidBy         Partner?   @relation("ExpensePaidBy", fields: [paidById], references: [id])
+  notes          String?
+  createdById    String
+  createdBy      Partner    @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([date])
+}
+
+model TimeEntry {
+  id              String   @id @default(cuid())
+  date            DateTime @db.Date
+  partnerId       String
+  partner         Partner  @relation("TimeEntryPartner", fields: [partnerId], references: [id])
+  minutes         Int
+  topic           String
+  notes           String?
+  // Costo orario del socio nel giorno della registrazione (non cambia se poi cambia la tariffa).
+  hourlyRateCents Int
+  createdById     String
+  createdBy       Partner  @relation("TimeEntryCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime @default(now())
+
+  @@index([date])
+}
+
+// Soldi messi da un socio nella cassa comune.
+model Contribution {
+  id          String   @id @default(cuid())
+  date        DateTime @db.Date
+  partnerId   String
+  partner     Partner  @relation("ContributionPartner", fields: [partnerId], references: [id])
+  amountCents Int
+  notes       String?
+  createdById String
+  createdBy   Partner  @relation("ContributionCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([date])
+}
+
+model Setting {
+  key   String @id
+  value String
+}

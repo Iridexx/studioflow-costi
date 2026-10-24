@@ -1,0 +1,110 @@
+# StudioFlow Costi
+
+Programma interno per i costi di sviluppo di StudioFlow: spese, abbonamenti, API di intelligenza
+artificiale, server, ore di lavoro e versamenti dei soci.
+
+**Non fa parte di StudioFlow e non va mai distribuito agli studi.** Vive in questo repository
+privato; in StudioFlow c'è solo una voce di menu che lo apre, visibile se sul server è impostata
+`STUDIOFLOW_COSTI_URL`.
+
+## Cosa c'è
+
+- **Riepilogo**: speso dall'inizio, speso nell'anno, costi fissi al mese, previsione dei
+  prossimi 12 mesi, cassa comune, costo per studio pilota, spese per mese e per categoria,
+  saldo tra soci, ore di lavoro, abbonamenti attivi.
+- **Spese**: una tantum, mensili o annuali (con data di fine quando si disdice), IVA, fornitore,
+  categoria, chi l'ha pagata (cassa comune o un socio di tasca sua).
+- **Ore**: chi, quando, quante, su cosa; valorizzate con il costo orario del socio nel giorno
+  della registrazione.
+- **Soci e versamenti**: quota di ciascuno, versamenti in cassa comune, saldo (chi ha messo più
+  o meno della sua quota).
+- **Impostazioni**: la propria password, numero di studi pilota, categorie di spesa.
+- **Esporta in Excel**: tutti i dati in un file, per il commercialista o per archivio.
+
+Ognuno entra con il proprio nome utente e la propria password, diversa da quella di StudioFlow.
+
+## Installazione sul PC server (una volta sola)
+
+Serve lo stesso PC dove gira StudioFlow, con Node.js 22, pnpm e Git già installati. Il database
+è lo stesso PostgreSQL di StudioFlow, in un database separato (`studioflow_costi`) che viene
+creato da solo.
+
+In PowerShell, un comando alla volta:
+
+```
+cd "C:\Users\marco\Programmazione\Visual Studio"
+git clone https://github.com/Iridexx/studioflow-costi.git
+cd studioflow-costi
+copy .env.example .env
+```
+
+Se la password del database di StudioFlow è diversa da quella predefinita, correggi
+`DATABASE_URL` nel file `.env` come nel `.env` di StudioFlow (cambia solo il nome finale del
+database: `studioflow_costi`).
+
+Poi doppio clic su **`aggiorna-costi.bat`**: installa, prepara il database e avvia il programma
+sulla porta **3100** (finestra "StudioFlow-Costi" ridotta a icona: se la chiudi il programma si
+ferma). Al primo accesso da http://localhost:3100 si crea l'utente amministratore; da
+**Soci e versamenti** si aggiunge il socio con la sua password.
+
+### Backup notturno
+
+Nel file `.env` indica in `COSTI_BACKUP_DIR` una cartella sincronizzata (es.
+`C:\Users\marco\OneDrive\Backup StudioFlow Costi`), poi doppio clic su **`installa-backup.bat`**:
+programma il backup ogni sera alle 23 e ne fa subito uno di prova. Si tengono gli ultimi 30.
+
+Per ripristinare un backup (con il database di Docker):
+
+```
+docker cp "percorso\studioflow-costi-AAAAMMGG-HHMMSS.dump" studioflow-postgres-1:/tmp/ripristino.dump
+docker exec studioflow-postgres-1 pg_restore -U studioflow -d studioflow_costi --clean /tmp/ripristino.dump
+```
+
+### Collegamento dal menu di StudioFlow
+
+Nel file `.env` di **StudioFlow** (non di questo programma) aggiungi:
+
+```
+STUDIOFLOW_COSTI_URL="http://localhost:3100"
+```
+
+e riavvia StudioFlow con `aggiorna-studioflow.bat -Forza`. Titolare e amministratori vedono la
+voce "Costi di sviluppo" in fondo al menu. Se lo usate anche da fuori con Tailscale, metti
+l'indirizzo Tailscale del PC al posto di `localhost` (es. `http://nome-pc:3100`), che funziona
+sia in ufficio sia fuori.
+
+### Accesso del socio da fuori ufficio
+
+Come StudioFlow: con Tailscale. Il socio installa Tailscale, tu lo inviti nella tua rete (o
+condividi solo il PC server dalla console di Tailscale) e lui apre `http://nome-pc:3100`.
+Il PC server deve essere acceso.
+
+## Aggiornare
+
+Doppio clic su `aggiorna-costi.bat`: scarica le novità, prepara la nuova versione mentre la
+vecchia continua a funzionare, aggiorna il database e riavvia. Se qualcosa va storto riavvia la
+versione precedente.
+
+## Password dimenticata
+
+Un amministratore la cambia da **Soci e versamenti → Modifica**. Se nessuno riesce più a entrare,
+sul PC server:
+
+```
+pnpm reimposta-password <nome utente> <nuova password>
+```
+
+## Sviluppo
+
+```
+pnpm install
+pnpm db:deploy
+pnpm dev            # http://localhost:3100
+pnpm lint
+pnpm typecheck
+pnpm test
+```
+
+Stack come StudioFlow: Next.js 16, React 19, Prisma 7 + PostgreSQL, Tailwind 4. Importi in
+centesimi, ore in minuti. Le spese ricorrenti sono una sola voce che si espande negli addebiti
+mensili o annuali (`src/modules/summary/calc.ts`).

@@ -1,0 +1,35 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const items = [
+  { href: "/", label: "Riepilogo" },
+  { href: "/spese", label: "Spese" },
+  { href: "/ore", label: "Ore" },
+  { href: "/soci", label: "Soci e versamenti" },
+  { href: "/impostazioni", label: "Impostazioni" },
+];
+
+export function Nav() {
+  const pathname = usePathname();
+  return (
+    <nav className="flex gap-1 overflow-x-auto">
+      {items.map((item) => {
+        const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={
+              "whitespace-nowrap rounded-md px-3 py-2 text-sm " +
+              (active ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100")
+            }
+          >
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
