@@ -11,7 +11,8 @@ const items = [
   { href: "/impostazioni", label: "Impostazioni" },
 ];
 
-export function Nav() {
+// waiting: spese che aspettano l'approvazione o una risposta del socio collegato.
+export function Nav({ waiting = 0 }: { waiting?: number }) {
   const pathname = usePathname();
   return (
     <nav className="flex gap-1 overflow-x-auto">
@@ -27,6 +28,11 @@ export function Nav() {
             }
           >
             {item.label}
+            {item.href === "/spese" && waiting > 0 && (
+              <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-semibold text-white">
+                {waiting}
+              </span>
+            )}
           </Link>
         );
       })}

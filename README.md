@@ -13,12 +13,20 @@ privato; in StudioFlow c'è solo una voce di menu che lo apre, visibile se sul s
   prossimi 12 mesi, cassa comune, costo per studio pilota, spese per mese e per categoria,
   saldo tra soci, ore di lavoro, abbonamenti attivi.
 - **Spese**: una tantum, mensili o annuali (con data di fine quando si disdice), IVA, fornitore,
-  categoria, chi l'ha pagata (cassa comune o un socio di tasca sua).
+  categoria, chi l'ha pagata (cassa comune o un socio di tasca sua). Le ricorrenti si inseriscono
+  una volta sola: il programma conta da solo ogni addebito mensile o annuale.
+- **Approvazione delle spese**: una spesa entra nei conti solo quando l'hanno approvata tutti i
+  soci con accesso (chi la inserisce la approva in automatico; con un socio solo è subito nei
+  conti). Su ogni spesa i soci possono scriversi per chiedere spiegazioni prima di approvare. Chi
+  ha qualcosa da approvare o una domanda a cui rispondere lo vede in alto in ogni pagina.
+  Modificare una spesa la rimette in attesa; una spesa già approvata la elimina solo un
+  amministratore.
 - **Ore**: chi, quando, quante, su cosa; valorizzate con il costo orario del socio nel giorno
   della registrazione.
 - **Soci e versamenti**: quota di ciascuno, versamenti in cassa comune, saldo (chi ha messo più
   o meno della sua quota).
-- **Impostazioni**: la propria password, numero di studi pilota, categorie di spesa.
+- **Impostazioni**: la propria password, numero di studi pilota, categorie di spesa, indirizzo
+  del programma da mandare ai soci.
 - **Esporta in Excel**: tutti i dati in un file, per il commercialista o per archivio.
 
 Ognuno entra con il proprio nome utente e la propria password, diversa da quella di StudioFlow.
@@ -45,7 +53,18 @@ database: `studioflow_costi`).
 Poi doppio clic su **`aggiorna-costi.bat`**: installa, prepara il database e avvia il programma
 sulla porta **3100** (finestra "StudioFlow-Costi" ridotta a icona: se la chiudi il programma si
 ferma). Al primo accesso da http://localhost:3100 si crea l'utente amministratore; da
-**Soci e versamenti** si aggiunge il socio con la sua password.
+**Soci e versamenti** si aggiunge il socio.
+
+### Aggiungere un socio
+
+Solo un amministratore. In **Soci e versamenti → Aggiungi un socio** scrivi nome, nome utente,
+email e una password provvisoria (o premi **Genera**). Dopo il salvataggio compare l'email già
+pronta con indirizzo, nome utente e password: **Apri nel programma di posta**, **Apri in Gmail**
+oppure **Copia il messaggio**. L'email parte dalla tua casella, il programma non spedisce nulla.
+Al primo accesso il socio deve scegliere una password sua prima di poter fare altro.
+
+Perché l'indirizzo nell'email sia giusto, salvalo una volta in **Impostazioni → Indirizzo per i
+soci** (es. `http://nome-pc:3100`); se apri il programma da `localhost` te lo ricorda.
 
 ### Backup notturno
 
@@ -87,7 +106,8 @@ versione precedente.
 
 ## Password dimenticata
 
-Un amministratore la cambia da **Soci e versamenti → Modifica**. Se nessuno riesce più a entrare,
+Un amministratore dà una nuova password provvisoria da **Soci e versamenti → Modifica** e
+prepara di nuovo l'email; il socio la cambierà al primo accesso. Se nessuno riesce più a entrare,
 sul PC server:
 
 ```

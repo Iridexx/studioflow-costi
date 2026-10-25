@@ -1,3 +1,4 @@
+import type { FormState } from "@/components/action-form";
 import { parseDay, parseEuro, parseHours, parsePercent } from "@/lib/format";
 
 // Lettura dei campi dei moduli: ogni funzione lancia FormError con un messaggio per l'utente.
@@ -51,10 +52,11 @@ export function checkbox(form: FormData, key: string): boolean {
 }
 
 // Esegue l'azione e trasforma gli errori di compilazione in messaggi del modulo.
-export async function handle(run: () => Promise<string | void>) {
+export async function handle(run: () => Promise<string | FormState | void>): Promise<FormState> {
   try {
-    const ok = await run();
-    return ok ? { ok } : {};
+    const result = await run();
+    if (!result) return {};
+    return typeof result === "string" ? { ok: result } : result;
   } catch (error) {
     if (error instanceof FormError) return { error: error.message };
     throw error;

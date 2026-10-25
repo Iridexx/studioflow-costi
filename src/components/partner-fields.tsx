@@ -7,6 +7,7 @@ export function PartnerFields({
   defaults?: {
     name: string;
     username: string | null;
+    email: string | null;
     shareBasisPoints: number;
     hourlyRateCents: number;
     isAdmin: boolean;
@@ -23,6 +24,15 @@ export function PartnerFields({
           name="username"
           autoCapitalize="none"
           defaultValue={defaults?.username ?? ""}
+          className={inputClass}
+        />
+      </Field>
+      <Field label="Email" hint="Per mandargli le credenziali; non serve per entrare">
+        <input
+          name="email"
+          type="email"
+          autoCapitalize="none"
+          defaultValue={defaults?.email ?? ""}
           className={inputClass}
         />
       </Field>

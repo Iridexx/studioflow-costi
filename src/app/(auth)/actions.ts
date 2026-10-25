@@ -3,9 +3,15 @@
 import { redirect } from "next/navigation";
 import type { FormState } from "@/components/action-form";
 import { passwordProblem } from "@/lib/password";
-import { endSession, startSession } from "@/lib/session";
+import { endSession, getCurrentPartner, startSession } from "@/lib/session";
 import { lockedMinutes, recordFailure, recordSuccess } from "@/modules/auth/throttle";
-import { authenticate, createPartner, hasAnyLogin } from "@/modules/partners/service";
+import {
+  authenticate,
+  checkPassword,
+  createPartner,
+  hasAnyLogin,
+  setPassword,
+} from "@/modules/partners/service";
 
 const text = (form: FormData, key: string) => String(form.get(key) ?? "").trim();
 
@@ -22,6 +28,24 @@ export async function signIn(_: FormState, form: FormData): Promise<FormState> {
   }
   recordSuccess(username);
   await startSession(partner.id);
+  redirect(partner.mustChangePassword ? "/cambia-password" : "/");
+}
+
+// Primo accesso con la password provvisoria data dall'amministratore: il socio ne sceglie una sua.
+export async function replaceTemporaryPassword(_: FormState, form: FormData): Promise<FormState> {
+  const me = await getCurrentPartner();
+  if (!me) redirect("/accedi");
+  if (!me.mustChangePassword) redirect("/");
+  const password = String(form.get("password") ?? "");
+  const problem = passwordProblem(password);
+  if (problem) return { error: problem };
+  if (password !== String(form.get("confirm") ?? ""))
+    return { error: "Le due password non coincidono." };
+  if (await checkPassword(me.id, password))
+    return { error: "Scegli una password diversa da quella provvisoria." };
+  // Cambiare la password chiude tutte le sessioni: si riapre subito quella di questo browser.
+  await setPassword(me.id, password);
+  await startSession(me.id);
   redirect("/");
 }
 
@@ -44,7 +68,15 @@ export async function createFirstPartner(_: FormState, form: FormData): Promise<
   if (password !== String(form.get("confirm") ?? ""))
     return { error: "Le due password non coincidono." };
   const partner = await createPartner(
-    { name, username, shareBasisPoints: 10000, hourlyRateCents: 0, isAdmin: true, active: true },
+    {
+      name,
+      username,
+      email: null,
+      shareBasisPoints: 10000,
+      hourlyRateCents: 0,
+      isAdmin: true,
+      active: true,
+    },
     password,
   );
   await startSession(partner.id);

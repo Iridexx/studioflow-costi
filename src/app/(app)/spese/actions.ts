@@ -16,8 +16,11 @@ import {
 import { prisma } from "@/lib/db";
 import { requirePartner } from "@/lib/session";
 import {
+  addExpenseMessage,
+  approveExpense,
   createExpense,
   deleteExpense,
+  getExpense,
   updateExpense,
   type ExpenseInput,
 } from "@/modules/expenses/service";
@@ -57,24 +60,55 @@ export async function addExpense(_: FormState, form: FormData): Promise<FormStat
   const partner = await requirePartner();
   return handle(async () => {
     const input = await readExpense(form);
-    await createExpense(input, partner.id);
+    const expense = await createExpense(input, partner.id);
     revalidatePath("/", "layout");
+    if (!(await getExpense(expense.id))?.approvedAt)
+      return `Spesa "${input.description}" inviata agli altri soci: entra nei conti quando l'hanno approvata tutti.`;
     return `Spesa "${input.description}" salvata.`;
   });
 }
 
 export async function editExpense(id: string, _: FormState, form: FormData): Promise<FormState> {
-  await requirePartner();
+  const me = await requirePartner();
   return handle(async () => {
-    await updateExpense(id, await readExpense(form));
+    await updateExpense(id, await readExpense(form), me.id);
     revalidatePath("/", "layout");
-    redirect("/spese");
+    redirect(`/spese/${id}`);
   });
 }
 
+// Una spesa già nei conti la elimina solo un amministratore; una in attesa anche chi l'ha inserita.
 export async function removeExpense(id: string): Promise<FormState> {
-  await requirePartner();
+  const me = await requirePartner();
+  const expense = await getExpense(id);
+  if (!expense) redirect("/spese");
+  if (!me.isAdmin && (expense.approvedAt || expense.createdById !== me.id))
+    return { error: "Questa spesa può eliminarla solo un amministratore." };
   await deleteExpense(id);
   revalidatePath("/", "layout");
   redirect("/spese");
+}
+
+export async function approve(id: string): Promise<FormState> {
+  const me = await requirePartner();
+  await approveExpense(id, me.id);
+  revalidatePath("/", "layout");
+  const expense = await getExpense(id);
+  return {
+    ok: expense?.approvedAt
+      ? "Approvata: ora la spesa è nei conti."
+      : "Approvata. Manca ancora l'approvazione di altri soci.",
+  };
+}
+
+export async function sendMessage(id: string, _: FormState, form: FormData): Promise<FormState> {
+  const me = await requirePartner();
+  return handle(async () => {
+    const body = requiredText(form, "body", "Messaggio");
+    if (body.length > 4000) throw new FormError("Il messaggio è troppo lungo.");
+    if (!(await getExpense(id))) throw new FormError("Spesa non trovata.");
+    await addExpenseMessage(id, me.id, body);
+    revalidatePath("/", "layout");
+    return "Messaggio inviato.";
+  });
 }

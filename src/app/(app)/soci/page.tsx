@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ActionForm } from "@/components/action-form";
 import { PartnerFields } from "@/components/partner-fields";
+import { TemporaryPasswordField } from "@/components/temporary-password-field";
 import {
   Card,
   Empty,
@@ -177,6 +178,7 @@ export default async function PartnersPage() {
                 {!p.active && <span className="ml-2 text-xs text-slate-500">(non attivo)</span>}
                 <span className="block text-xs text-slate-500">
                   {p.username ? `accede come "${p.username}"` : "senza accesso"}
+                  {p.mustChangePassword && " · non ha ancora cambiato la password provvisoria"}
                   {p.isAdmin && " · amministratore"} · quota {formatPercent(p.shareBasisPoints)} ·{" "}
                   {formatEuro(p.hourlyRateCents)}/ora
                 </span>
@@ -195,20 +197,13 @@ export default async function PartnersPage() {
       </Card>
 
       {me.isAdmin && (
-        <Card title="Aggiungi un socio">
+        <Card title="Aggiungi un socio (solo amministratori)">
           <ActionForm action={addPartner} submitLabel="Aggiungi socio">
             <PartnerFields />
-            <Field
-              label="Password"
-              hint={`Almeno ${MIN_PASSWORD_LENGTH} caratteri. Comunicala al socio, potrà cambiarla in Impostazioni.`}
-            >
-              <input
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                className={inputClass}
-              />
-            </Field>
+            <TemporaryPasswordField
+              label="Password provvisoria"
+              hint={`Almeno ${MIN_PASSWORD_LENGTH} caratteri, scrivila tu o premi Genera. Dopo il salvataggio prepari l'email per il socio; al primo accesso dovrà sceglierne una sua.`}
+            />
           </ActionForm>
         </Card>
       )}

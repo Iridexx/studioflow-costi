@@ -5,7 +5,8 @@ import { Card, Empty, PageTitle, inputClass, tableClass, tdClass, thClass } from
 import { formatDay, formatEuro, todayDay } from "@/lib/format";
 import { RECURRENCE_LABEL } from "@/lib/labels";
 import { chargeDates } from "@/modules/summary/calc";
-import { listCategories, listExpenses } from "@/modules/expenses/service";
+import { requirePartner } from "@/lib/session";
+import { listCategories, listExpenses, listPendingExpenses } from "@/modules/expenses/service";
 import { listPartners } from "@/modules/partners/service";
 import { addExpense } from "./actions";
 
@@ -14,11 +15,13 @@ export default async function ExpensesPage({
 }: {
   searchParams: Promise<{ anno?: string; categoria?: string }>;
 }) {
+  const me = await requirePartner();
   const params = await searchParams;
   const today = todayDay();
   const year = Number(params.anno) || today.getUTCFullYear();
-  const [expenses, categories, partners] = await Promise.all([
+  const [expenses, pending, categories, partners] = await Promise.all([
     listExpenses(),
+    listPendingExpenses(me.id),
     listCategories(),
     listPartners({ onlyActive: true }),
   ]);
@@ -47,7 +50,69 @@ export default async function ExpensesPage({
         </ActionForm>
       </Card>
 
-      <Card>
+      {pending.length > 0 && (
+        <Card title="In attesa di approvazione" className="mb-6 border-amber-300">
+          <p className="mb-3 text-sm text-slate-500">
+            Entrano nei conti quando le hanno approvate tutti i soci. Apri una spesa per approvarla
+            o per chiedere spiegazioni a chi l&apos;ha inserita.
+          </p>
+          <div className="overflow-x-auto">
+            <table className={tableClass}>
+              <thead>
+                <tr>
+                  <th className={thClass}>Data</th>
+                  <th className={thClass}>Descrizione</th>
+                  <th className={`${thClass} text-right`}>Importo</th>
+                  <th className={thClass}>Inserita da</th>
+                  <th className={thClass}>Stato</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pending.map(({ expense: e, missing, mustApprove, mustReply, messages }) => (
+                  <tr key={e.id} className="hover:bg-slate-50">
+                    <td className={`${tdClass} whitespace-nowrap`}>{formatDay(e.date)}</td>
+                    <td className={tdClass}>
+                      <Link
+                        href={`/spese/${e.id}`}
+                        className="font-medium text-slate-900 hover:underline"
+                      >
+                        {e.description}
+                      </Link>
+                      <span className="block text-xs text-slate-500">
+                        {RECURRENCE_LABEL[e.recurrence]}
+                        {messages > 0 && ` · ${messages} messaggi`}
+                      </span>
+                    </td>
+                    <td className={`${tdClass} text-right tabular-nums`}>
+                      {formatEuro(e.amountCents)}
+                    </td>
+                    <td className={tdClass}>{e.createdBy.name}</td>
+                    <td className={tdClass}>
+                      {mustApprove && (
+                        <span className="block font-medium text-amber-700">
+                          Tocca a te approvare
+                        </span>
+                      )}
+                      {mustReply && (
+                        <span className="block font-medium text-sky-700">
+                          C&apos;è una domanda per te
+                        </span>
+                      )}
+                      {!mustApprove && (
+                        <span className="block text-xs text-slate-500">
+                          Manca: {missing.map((p) => p.name).join(", ")}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      <Card title="Spese approvate">
         <form className="mb-4 flex flex-wrap items-end gap-3">
           <label className="text-sm">
             <span className="text-slate-500">Anno</span>

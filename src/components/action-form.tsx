@@ -1,8 +1,10 @@
 "use client";
 
 import { startTransition, useActionState, useEffect, useRef } from "react";
+import { InviteBox } from "@/components/invite-box";
+import type { Invite } from "@/modules/partners/invite";
 
-export type FormState = { error?: string; ok?: string };
+export type FormState = { error?: string; ok?: string; invite?: Invite };
 export type FormAction = (state: FormState, formData: FormData) => Promise<FormState>;
 
 // Modulo con messaggio d'errore o di conferma e pulsante che mostra l'attesa.
@@ -29,39 +31,43 @@ export function ActionForm({
   useEffect(() => {
     if (state.ok && resetOnSuccess) form.current?.reset();
   }, [state, resetOnSuccess]);
+  // Il riquadro dell'email sta fuori dal modulo: un Invio nei suoi campi non deve rimandarlo.
   return (
-    <form
-      ref={form}
-      onSubmit={(event) => {
-        event.preventDefault();
-        const data = new FormData(event.currentTarget);
-        startTransition(() => formAction(data));
-      }}
-      className={className}
-    >
-      {children}
-      {state.error && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          {state.error}
-        </p>
-      )}
-      {state.ok && (
-        <p role="status" className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-          {state.ok}
-        </p>
-      )}
-      <button
-        type="submit"
-        disabled={pending}
-        className={
-          (danger
-            ? "bg-white text-red-700 ring-1 ring-red-200 hover:bg-red-50"
-            : "bg-slate-900 text-white hover:bg-slate-700") +
-          " rounded-md px-4 py-2 text-sm font-medium disabled:opacity-60"
-        }
+    <>
+      <form
+        ref={form}
+        onSubmit={(event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          startTransition(() => formAction(data));
+        }}
+        className={className}
       >
-        {pending ? "Attendere…" : submitLabel}
-      </button>
-    </form>
+        {children}
+        {state.error && (
+          <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            {state.error}
+          </p>
+        )}
+        {state.ok && (
+          <p role="status" className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            {state.ok}
+          </p>
+        )}
+        <button
+          type="submit"
+          disabled={pending}
+          className={
+            (danger
+              ? "bg-white text-red-700 ring-1 ring-red-200 hover:bg-red-50"
+              : "bg-slate-900 text-white hover:bg-slate-700") +
+            " rounded-md px-4 py-2 text-sm font-medium disabled:opacity-60"
+          }
+        >
+          {pending ? "Attendere…" : submitLabel}
+        </button>
+      </form>
+      {state.invite && <InviteBox key={state.invite.body} invite={state.invite} />}
+    </>
   );
 }
