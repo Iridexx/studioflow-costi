@@ -3,17 +3,19 @@ import Link from "next/link";
 import { requirePartner } from "@/lib/session";
 import { countExpensesWaitingFor } from "@/modules/expenses/service";
 import { countTimeEntriesWaitingFor } from "@/modules/time/service";
+import { countAgreementWaitingFor } from "@/modules/agreement/service";
 import { signOut } from "../(auth)/actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const partner = await requirePartner();
-  const [waiting, waitingTime] = await Promise.all([
+  const [waiting, waitingTime, waitingAgreement] = await Promise.all([
     countExpensesWaitingFor(partner.id),
     countTimeEntriesWaitingFor(partner.id),
+    countAgreementWaitingFor(partner.id),
   ]);
   return (
     <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b border-slate-200 bg-white print:hidden">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <p className="font-semibold text-slate-900">StudioFlow Costi</p>
           <div className="order-3 w-full sm:order-2 sm:w-auto sm:flex-1">
@@ -30,7 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </header>
       {waiting > 0 && (
-        <div className="border-b border-amber-200 bg-amber-50">
+        <div className="border-b border-amber-200 bg-amber-50 print:hidden">
           <p className="mx-auto max-w-6xl px-4 py-2 text-sm text-amber-900">
             {waiting === 1
               ? "Una spesa aspetta la tua approvazione o una tua risposta."
@@ -42,13 +44,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       )}
       {waitingTime > 0 && (
-        <div className="border-b border-amber-200 bg-amber-50">
+        <div className="border-b border-amber-200 bg-amber-50 print:hidden">
           <p className="mx-auto max-w-6xl px-4 py-2 text-sm text-amber-900">
             {waitingTime === 1
               ? "Una registrazione di ore aspetta la tua conferma."
               : `${waitingTime} registrazioni di ore aspettano la tua conferma.`}{" "}
             <Link href="/ore" className="font-medium underline">
               Vai alle ore
+            </Link>
+          </p>
+        </div>
+      )}
+      {waitingAgreement > 0 && (
+        <div className="border-b border-amber-200 bg-amber-50 print:hidden">
+          <p className="mx-auto max-w-6xl px-4 py-2 text-sm text-amber-900">
+            L&apos;accordo tra soci aspetta una tua risposta (convalida o riapertura).{" "}
+            <Link href="/accordo" className="font-medium underline">
+              Vedi cosa è cambiato
             </Link>
           </p>
         </div>

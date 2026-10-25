@@ -8,6 +8,7 @@ const items = [
   { href: "/spese", label: "Spese" },
   { href: "/ore", label: "Ore" },
   { href: "/soci", label: "Soci e versamenti" },
+  { href: "/accordo", label: "Accordo" },
   { href: "/impostazioni", label: "Impostazioni" },
 ];
 

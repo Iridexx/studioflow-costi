@@ -12,22 +12,29 @@ datasource db {
 
 // Socio o collaboratore allo sviluppo. Con nome utente e password può entrare nel programma.
 model Partner {
-  id                 String   @id @default(cuid())
+  id                 String         @id @default(cuid())
   name               String
-  username           String?  @unique
+  username           String?        @unique
   passwordHash       String?
   // Password provvisoria scelta dall'amministratore: al primo accesso il socio deve cambiarla.
-  mustChangePassword Boolean  @default(false)
+  mustChangePassword Boolean        @default(false)
   // Solo per preparare l'email con le credenziali.
   email              String?
-  isAdmin            Boolean  @default(false)
-  active             Boolean  @default(true)
+  isAdmin            Boolean        @default(false)
+  active             Boolean        @default(true)
   // Quota di partecipazione alle spese, in centesimi di punto (5000 = 50%).
-  shareBasisPoints   Int      @default(0)
+  shareBasisPoints   Int            @default(0)
   // Costo orario usato per valorizzare le ore di lavoro.
-  hourlyRateCents    Int      @default(0)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  hourlyRateCents    Int            @default(0)
+  // Dati per l'accordo tra soci: li compila ogni socio dalla pagina "Accordo".
+  taxCode            String?
+  birthPlace         String?
+  birthDate          DateTime?      @db.Date
+  residence          String?
+  // Parte nell'accordo (A sviluppo, B commerciale); la sceglie l'amministratore.
+  agreementRole      AgreementRole? @unique
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   sessions        Session[]
   expensesPaid    Expense[]           @relation("ExpensePaidBy")
@@ -39,6 +46,13 @@ model Partner {
   approvals       ExpenseApproval[]
   expenseMessages ExpenseMessage[]
   timeApprovals   TimeEntryApproval[]
+  agreementEdits  AgreementVersion[]
+  agreementOks    AgreementApproval[]
+}
+
+enum AgreementRole {
+  A
+  B
 }
 
 model Session {
@@ -183,4 +197,44 @@ model TimeTopic {
   name     String  @unique
   position Int     @default(0)
   active   Boolean @default(true)
+}
+
+// Versioni dell'accordo tra soci. Ogni modifica salva una versione nuova (le precedenti restano
+// com'erano); la prima nasce da docs/accordo-soci.md. Quando tutti i soci con accesso hanno
+// convalidato l'ultima versione, questa diventa definitiva e il testo non si modifica più.
+model AgreementVersion {
+  id                String              @id @default(cuid())
+  number            Int                 @unique
+  text              String
+  // Cosa è cambiato, scritto da chi ha salvato la versione.
+  note              String
+  // Vuoto per la prima versione, presa dal file.
+  authorId          String?
+  author            Partner?            @relation(fields: [authorId], references: [id])
+  createdAt         DateTime            @default(now())
+  finalizedAt       DateTime?
+  // Richiesta di riaprire un accordo definitivo: si riapre quando la confermano tutti i soci.
+  reopenReason      String?
+  reopenRequestedAt DateTime?
+  reopenedAt        DateTime?
+  approvals         AgreementApproval[]
+}
+
+enum AgreementApprovalKind {
+  VALIDATE
+  REOPEN
+}
+
+// "Convalido" di un socio su una versione (chi la salva la convalida in automatico), oppure
+// "Sono d'accordo" sulla richiesta di riaprirla (chi la chiede è d'accordo in automatico).
+model AgreementApproval {
+  id        String                @id @default(cuid())
+  versionId String
+  version   AgreementVersion      @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  partnerId String
+  partner   Partner               @relation(fields: [partnerId], references: [id])
+  kind      AgreementApprovalKind @default(VALIDATE)
+  createdAt DateTime              @default(now())
+
+  @@unique([versionId, partnerId, kind])
 }
