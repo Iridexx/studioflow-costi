@@ -3,12 +3,22 @@ import { Card, Field, PageTitle, inputClass } from "@/components/ui";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 import { requirePartner } from "@/lib/session";
 import { listCategories } from "@/modules/expenses/service";
-import { getPilotStudios } from "@/modules/settings/service";
-import { addCategory, changeMyPassword, editCategory, savePilotStudios } from "./actions";
+import { getAppUrl, getPilotStudios } from "@/modules/settings/service";
+import {
+  addCategory,
+  changeMyPassword,
+  editCategory,
+  saveAppUrl,
+  savePilotStudios,
+} from "./actions";
 
 export default async function SettingsPage() {
   const me = await requirePartner();
-  const [categories, pilotStudios] = await Promise.all([listCategories(), getPilotStudios()]);
+  const [categories, pilotStudios, appUrl] = await Promise.all([
+    listCategories(),
+    getPilotStudios(),
+    getAppUrl(),
+  ]);
   return (
     <>
       <PageTitle title="Impostazioni" />
@@ -57,6 +67,24 @@ export default async function SettingsPage() {
                   type="number"
                   min={0}
                   defaultValue={pilotStudios}
+                  className={inputClass}
+                />
+              </Field>
+            </ActionForm>
+          </Card>
+        )}
+
+        {me.isAdmin && (
+          <Card title="Indirizzo per i soci">
+            <ActionForm action={saveAppUrl} submitLabel="Salva" resetOnSuccess={false}>
+              <Field
+                label="Indirizzo del programma"
+                hint="Quello che il socio scrive nel browser, es. http://nome-pc:3100 (con Tailscale). Va nell'email con le credenziali; vuoto = l'indirizzo da cui lo stai usando tu."
+              >
+                <input
+                  name="appUrl"
+                  defaultValue={appUrl ?? ""}
+                  placeholder="http://nome-pc:3100"
                   className={inputClass}
                 />
               </Field>

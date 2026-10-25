@@ -8,7 +8,8 @@ import { passwordProblem } from "@/lib/password";
 import { requireAdmin, requirePartner } from "@/lib/session";
 import { categoryNameTaken, createCategory, updateCategory } from "@/modules/expenses/service";
 import { checkPassword, setPassword } from "@/modules/partners/service";
-import { setPilotStudios } from "@/modules/settings/service";
+import { normalizeAppUrl } from "@/modules/partners/invite";
+import { setAppUrl, setPilotStudios } from "@/modules/settings/service";
 
 export async function changeMyPassword(_: FormState, form: FormData): Promise<FormState> {
   const me = await requirePartner();
@@ -56,5 +57,17 @@ export async function editCategory(id: string, _: FormState, form: FormData): Pr
     await updateCategory(id, { name, active: checkbox(form, "active") });
     revalidatePath("/", "layout");
     return "Salvato.";
+  });
+}
+
+export async function saveAppUrl(_: FormState, form: FormData): Promise<FormState> {
+  await requireAdmin();
+  return handle(async () => {
+    const raw = text(form, "appUrl");
+    const url = normalizeAppUrl(raw);
+    if (raw && !url) throw new FormError("Indirizzo non valido (es. http://nome-pc:3100).");
+    await setAppUrl(url);
+    revalidatePath("/", "layout");
+    return url ? `Salvato: ${url}` : "Indirizzo tolto: si userà quello da cui apri il programma.";
   });
 }

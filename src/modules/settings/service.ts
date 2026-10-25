@@ -16,3 +16,23 @@ export async function setPilotStudios(value: number) {
     update: { value: String(value) },
   });
 }
+
+const APP_URL = "appUrl";
+
+// Indirizzo con cui i soci aprono il programma (es. http://nome-pc:3100), per l'email d'invito.
+export async function getAppUrl(): Promise<string | null> {
+  const row = await prisma.setting.findUnique({ where: { key: APP_URL } });
+  return row?.value || null;
+}
+
+export async function setAppUrl(value: string | null) {
+  if (!value) {
+    await prisma.setting.deleteMany({ where: { key: APP_URL } });
+    return;
+  }
+  await prisma.setting.upsert({
+    where: { key: APP_URL },
+    create: { key: APP_URL, value },
+    update: { value },
+  });
+}

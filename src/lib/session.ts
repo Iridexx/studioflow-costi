@@ -6,7 +6,12 @@ import { prisma } from "@/lib/db";
 const COOKIE = "costi_sessione";
 const SESSION_DAYS = 30;
 
-export type CurrentPartner = { id: string; name: string; isAdmin: boolean };
+export type CurrentPartner = {
+  id: string;
+  name: string;
+  isAdmin: boolean;
+  mustChangePassword: boolean;
+};
 
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -45,17 +50,23 @@ export async function getCurrentPartner(): Promise<CurrentPartner | null> {
   if (!token) return null;
   const session = await prisma.session.findUnique({
     where: { tokenHash: hashToken(token) },
-    include: { partner: { select: { id: true, name: true, isAdmin: true, active: true } } },
+    include: {
+      partner: {
+        select: { id: true, name: true, isAdmin: true, active: true, mustChangePassword: true },
+      },
+    },
   });
   if (!session || session.expiresAt < new Date() || !session.partner.active) return null;
-  const { id, name, isAdmin } = session.partner;
-  return { id, name, isAdmin };
+  const { id, name, isAdmin, mustChangePassword } = session.partner;
+  return { id, name, isAdmin, mustChangePassword };
 }
 
 // Per ogni pagina e azione: senza accesso si torna al login (o al primo accesso, se non c'è
-// ancora nessuno con una password).
+// ancora nessuno con una password). Chi è entrato con la password provvisoria non può fare altro
+// finché non l'ha cambiata.
 export async function requirePartner(): Promise<CurrentPartner> {
   const partner = await getCurrentPartner();
+  if (partner?.mustChangePassword) redirect("/cambia-password");
   if (partner) return partner;
   const withLogin = await prisma.partner.count({ where: { passwordHash: { not: null } } });
   redirect(withLogin === 0 ? "/primo-accesso" : "/accedi");
