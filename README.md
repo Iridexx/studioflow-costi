@@ -22,12 +22,16 @@ privato; in StudioFlow c'è solo una voce di menu che lo apre, visibile se sul s
   Modificare una spesa la rimette in attesa; una spesa già approvata la elimina solo un
   amministratore.
 - **Ore**: chi, quando, quante, su cosa; valorizzate con il costo orario del socio nel giorno
-  della registrazione.
+  della registrazione (le ore registrate quando il costo era 0 € prendono il primo costo orario
+  impostato). L'argomento si sceglie da un menu; uno nuovo scritto lì entra nel menu da solo.
+  Come le spese, le ore entrano nei conti quando le hanno confermate tutti i soci: la colonna
+  Confermate dice a che punto sono.
 - **Soci e versamenti**: quota di ciascuno (la somma fa sempre 100%: quando entra un socio o
   cambia una quota, la differenza si toglie agli altri, da sola se l'altro socio è uno solo,
   altrimenti con una proposta in proporzione che si può correggere), versamenti in cassa comune, saldo (chi ha messo più
   o meno della sua quota).
-- **Impostazioni**: la propria password, numero di studi pilota, categorie di spesa, indirizzo
+- **Impostazioni**: la propria password, argomenti delle ore (rinominarli aggiorna anche le ore
+  già registrate), numero di studi pilota, categorie di spesa, indirizzo
   del programma da mandare ai soci.
 - **Esporta in Excel**: tutti i dati in un file, per il commercialista o per archivio.
 

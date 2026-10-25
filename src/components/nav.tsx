@@ -12,7 +12,8 @@ const items = [
 ];
 
 // waiting: spese che aspettano l'approvazione o una risposta del socio collegato.
-export function Nav({ waiting = 0 }: { waiting?: number }) {
+// waitingTime: ore che aspettano la conferma del socio collegato.
+export function Nav({ waiting = 0, waitingTime = 0 }: { waiting?: number; waitingTime?: number }) {
   const pathname = usePathname();
   return (
     <nav className="flex gap-1 overflow-x-auto">
@@ -28,6 +29,11 @@ export function Nav({ waiting = 0 }: { waiting?: number }) {
             }
           >
             {item.label}
+            {item.href === "/ore" && waitingTime > 0 && (
+              <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-semibold text-white">
+                {waitingTime}
+              </span>
+            )}
             {item.href === "/spese" && waiting > 0 && (
               <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-semibold text-white">
                 {waiting}

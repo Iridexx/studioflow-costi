@@ -6,10 +6,13 @@ import { listCategories } from "@/modules/expenses/service";
 import { MailSettingsForm } from "@/components/mail-settings-form";
 import { getMailSettings } from "@/modules/mail/service";
 import { getAppUrl, getPilotStudios } from "@/modules/settings/service";
+import { listTopics } from "@/modules/time/service";
 import {
   addCategory,
+  addTopic,
   changeMyPassword,
   editCategory,
+  editTopic,
   removeMailSetup,
   saveAppUrl,
   saveMailSetup,
@@ -18,11 +21,12 @@ import {
 
 export default async function SettingsPage() {
   const me = await requirePartner();
-  const [categories, pilotStudios, appUrl, mail] = await Promise.all([
+  const [categories, pilotStudios, appUrl, mail, topics] = await Promise.all([
     listCategories(),
     getPilotStudios(),
     getAppUrl(),
     getMailSettings(),
+    listTopics(),
   ]);
   return (
     <>
@@ -133,6 +137,46 @@ export default async function SettingsPage() {
             </ActionForm>
           </Card>
         )}
+
+        <Card title="Argomenti delle ore" className="lg:col-span-2">
+          <p className="mb-4 text-sm text-slate-500">
+            Le voci del menu Argomento nella pagina Ore. Rinominando un argomento cambia anche nelle
+            ore già registrate; togliendo &quot;In uso&quot; sparisce dal menu ma resta nelle ore
+            vecchie.
+          </p>
+          <ul className="mb-6 space-y-3">
+            {topics.map((t) => (
+              <li key={t.id}>
+                <ActionForm
+                  action={editTopic.bind(null, t.id)}
+                  submitLabel="Salva"
+                  resetOnSuccess={false}
+                  className="flex flex-wrap items-center gap-3"
+                >
+                  <input
+                    name="name"
+                    defaultValue={t.name}
+                    required
+                    aria-label="Nome dell'argomento"
+                    className={`${inputClass} mt-0 max-w-xs`}
+                  />
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="active" defaultChecked={t.active} /> In uso
+                  </label>
+                </ActionForm>
+              </li>
+            ))}
+          </ul>
+          <ActionForm
+            action={addTopic}
+            submitLabel="Aggiungi argomento"
+            className="flex flex-wrap items-end gap-3"
+          >
+            <Field label="Nuovo argomento">
+              <input name="name" required className={inputClass} />
+            </Field>
+          </ActionForm>
+        </Card>
 
         {me.isAdmin && (
           <Card title="Categorie di spesa" className="lg:col-span-2">

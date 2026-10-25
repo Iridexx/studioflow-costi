@@ -8,12 +8,23 @@ import { FormError, day, handle, hours, optionalText, requiredText, text } from 
 import { formatHours } from "@/lib/format";
 import { requirePartner } from "@/lib/session";
 import {
+  confirmTimeEntry,
   createTimeEntry,
+  ensureTopic,
   deleteTimeEntry,
   getTimeEntry,
   updateTimeEntry,
   type TimeEntryInput,
 } from "@/modules/time/service";
+
+// Argomento scelto dal menu, oppure scritto nuovo: in quel caso entra nel menu.
+async function readTopic(form: FormData): Promise<string> {
+  const choice = text(form, "topicChoice");
+  if (choice && choice !== "__nuovo__") return choice;
+  const name = requiredText(form, "topicNew", "Nuovo argomento");
+  if (name.length > 80) throw new FormError("L'argomento è troppo lungo.");
+  return ensureTopic(name);
+}
 
 async function readTimeEntry(form: FormData): Promise<TimeEntryInput> {
   const partnerId = text(form, "partnerId");
@@ -26,7 +37,7 @@ async function readTimeEntry(form: FormData): Promise<TimeEntryInput> {
     partnerId,
     date: day(form, "date", "Data"),
     minutes,
-    topic: requiredText(form, "topic", "Argomento"),
+    topic: await readTopic(form),
     notes: optionalText(form, "notes"),
   };
 }
@@ -35,14 +46,16 @@ export async function addTimeEntry(_: FormState, form: FormData): Promise<FormSt
   const partner = await requirePartner();
   return handle(async () => {
     const input = await readTimeEntry(form);
-    await createTimeEntry(input, partner.id);
+    const entry = await createTimeEntry(input, partner.id);
     revalidatePath("/", "layout");
-    return `${formatHours(input.minutes)} registrate.`;
+    return entry.approvedAt
+      ? `${formatHours(input.minutes)} registrate.`
+      : `${formatHours(input.minutes)} registrate: entrano nei conti quando le confermano gli altri soci.`;
   });
 }
 
 export async function editTimeEntry(id: string, _: FormState, form: FormData): Promise<FormState> {
-  await requirePartner();
+  const me = await requirePartner();
   return handle(async () => {
     const current = await getTimeEntry(id);
     if (!current) throw new FormError("Registrazione non trovata.");
@@ -53,15 +66,28 @@ export async function editTimeEntry(id: string, _: FormState, form: FormData): P
       rate = (await prisma.partner.findUniqueOrThrow({ where: { id: input.partnerId } }))
         .hourlyRateCents;
     }
-    await updateTimeEntry(id, input, rate);
+    await updateTimeEntry(id, input, rate, me.id);
     revalidatePath("/", "layout");
     redirect("/ore");
   });
 }
 
+// Ore già confermate le elimina solo un amministratore; in attesa anche chi le ha inserite.
 export async function removeTimeEntry(id: string): Promise<FormState> {
-  await requirePartner();
+  const me = await requirePartner();
+  const entry = await getTimeEntry(id);
+  if (!entry) redirect("/ore");
+  if (!me.isAdmin && (entry.approvedAt || entry.createdById !== me.id))
+    return { error: "Queste ore può eliminarle solo un amministratore." };
   await deleteTimeEntry(id);
   revalidatePath("/", "layout");
   redirect("/ore");
+}
+
+export async function confirmTime(id: string): Promise<FormState> {
+  const me = await requirePartner();
+  if (!(await getTimeEntry(id))) return { error: "Registrazione non trovata." };
+  await confirmTimeEntry(id, me.id);
+  revalidatePath("/", "layout");
+  return { ok: "Confermate." };
 }

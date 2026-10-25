@@ -17,6 +17,7 @@ import {
 } from "@/modules/mail/service";
 import { normalizeAppUrl } from "@/modules/partners/invite";
 import { setAppUrl, setPilotStudios } from "@/modules/settings/service";
+import { createTopic, topicNameTaken, updateTopic } from "@/modules/time/service";
 
 export async function changeMyPassword(_: FormState, form: FormData): Promise<FormState> {
   const me = await requirePartner();
@@ -128,4 +129,27 @@ export async function removeMailSetup(): Promise<FormState> {
   await deleteMailSettings();
   revalidatePath("/", "layout");
   return { ok: "Invio delle email disattivato." };
+}
+
+// Argomenti delle ore: li gestisce ogni socio, come quando li scrive registrando le ore.
+export async function addTopic(_: FormState, form: FormData): Promise<FormState> {
+  await requirePartner();
+  return handle(async () => {
+    const name = requiredText(form, "name", "Argomento");
+    if (await topicNameTaken(name)) throw new FormError("Questo argomento c'è già.");
+    await createTopic(name);
+    revalidatePath("/", "layout");
+    return `Argomento "${name}" aggiunto.`;
+  });
+}
+
+export async function editTopic(id: string, _: FormState, form: FormData): Promise<FormState> {
+  await requirePartner();
+  return handle(async () => {
+    const name = requiredText(form, "name", "Argomento");
+    if (await topicNameTaken(name, id)) throw new FormError("Questo argomento c'è già.");
+    await updateTopic(id, { name, active: checkbox(form, "active") });
+    revalidatePath("/", "layout");
+    return "Salvato.";
+  });
 }

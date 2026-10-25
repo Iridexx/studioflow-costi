@@ -30,14 +30,15 @@ model Partner {
   updatedAt          DateTime @updatedAt
 
   sessions        Session[]
-  expensesPaid    Expense[]         @relation("ExpensePaidBy")
-  expensesCreated Expense[]         @relation("ExpenseCreatedBy")
-  timeEntries     TimeEntry[]       @relation("TimeEntryPartner")
-  timeCreated     TimeEntry[]       @relation("TimeEntryCreatedBy")
-  contributions   Contribution[]    @relation("ContributionPartner")
-  contribCreated  Contribution[]    @relation("ContributionCreatedBy")
+  expensesPaid    Expense[]           @relation("ExpensePaidBy")
+  expensesCreated Expense[]           @relation("ExpenseCreatedBy")
+  timeEntries     TimeEntry[]         @relation("TimeEntryPartner")
+  timeCreated     TimeEntry[]         @relation("TimeEntryCreatedBy")
+  contributions   Contribution[]      @relation("ContributionPartner")
+  contribCreated  Contribution[]      @relation("ContributionCreatedBy")
   approvals       ExpenseApproval[]
   expenseMessages ExpenseMessage[]
+  timeApprovals   TimeEntryApproval[]
 }
 
 model Session {
@@ -124,20 +125,35 @@ model ExpenseMessage {
 }
 
 model TimeEntry {
-  id              String   @id @default(cuid())
-  date            DateTime @db.Date
+  id              String              @id @default(cuid())
+  date            DateTime            @db.Date
   partnerId       String
-  partner         Partner  @relation("TimeEntryPartner", fields: [partnerId], references: [id])
+  partner         Partner             @relation("TimeEntryPartner", fields: [partnerId], references: [id])
   minutes         Int
   topic           String
   notes           String?
   // Costo orario del socio nel giorno della registrazione (non cambia se poi cambia la tariffa).
   hourlyRateCents Int
   createdById     String
-  createdBy       Partner  @relation("TimeEntryCreatedBy", fields: [createdById], references: [id])
-  createdAt       DateTime @default(now())
+  createdBy       Partner             @relation("TimeEntryCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime            @default(now())
+  // Come le spese: entrano nei conti quando le hanno confermate tutti i soci. Vuoto = in attesa.
+  approvedAt      DateTime?
+  approvals       TimeEntryApproval[]
 
   @@index([date])
+}
+
+// "Confermo" di un socio sulle ore registrate. Chi le inserisce o le modifica conferma in automatico.
+model TimeEntryApproval {
+  id          String    @id @default(cuid())
+  timeEntryId String
+  timeEntry   TimeEntry @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
+  partnerId   String
+  partner     Partner   @relation(fields: [partnerId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@unique([timeEntryId, partnerId])
 }
 
 // Soldi messi da un socio nella cassa comune.
@@ -158,4 +174,13 @@ model Contribution {
 model Setting {
   key   String @id
   value String
+}
+
+// Argomenti delle ore, proposti nel menu a tendina. Uno nuovo scritto registrando le ore si
+// aggiunge da solo; da Impostazioni si rinominano o si tolgono dal menu.
+model TimeTopic {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  position Int     @default(0)
+  active   Boolean @default(true)
 }
