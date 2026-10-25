@@ -23,7 +23,9 @@ privato; in StudioFlow c'è solo una voce di menu che lo apre, visibile se sul s
   amministratore.
 - **Ore**: chi, quando, quante, su cosa; valorizzate con il costo orario del socio nel giorno
   della registrazione.
-- **Soci e versamenti**: quota di ciascuno, versamenti in cassa comune, saldo (chi ha messo più
+- **Soci e versamenti**: quota di ciascuno (la somma fa sempre 100%: quando entra un socio o
+  cambia una quota, la differenza si toglie agli altri, da sola se l'altro socio è uno solo,
+  altrimenti con una proposta in proporzione che si può correggere), versamenti in cassa comune, saldo (chi ha messo più
   o meno della sua quota).
 - **Impostazioni**: la propria password, numero di studi pilota, categorie di spesa, indirizzo
   del programma da mandare ai soci.

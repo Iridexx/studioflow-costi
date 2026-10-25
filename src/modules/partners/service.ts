@@ -84,3 +84,12 @@ export async function countAdmins(exceptId?: string) {
     where: { isAdmin: true, active: true, passwordHash: { not: null }, id: { not: exceptId } },
   });
 }
+
+// Nuove quote degli altri soci, salvate insieme perché il totale resti 100%.
+export async function setShares(shares: { id: string; share: number }[]) {
+  await prisma.$transaction(
+    shares.map((s) =>
+      prisma.partner.update({ where: { id: s.id }, data: { shareBasisPoints: s.share } }),
+    ),
+  );
+}
