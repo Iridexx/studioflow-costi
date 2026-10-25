@@ -30,6 +30,10 @@ privato; in StudioFlow c'è solo una voce di menu che lo apre, visibile se sul s
   cambia una quota, la differenza si toglie agli altri, da sola se l'altro socio è uno solo,
   altrimenti con una proposta in proporzione che si può correggere), versamenti in cassa comune, saldo (chi ha messo più
   o meno della sua quota).
+- **Accordo**: la bozza dell'accordo tra i soci (`docs/accordo-soci.md`) con i dati delle parti
+  presi dal programma. Ogni socio inserisce i propri dati (codice fiscale, nascita, residenza),
+  l'amministratore sceglie chi è la Parte A e chi la Parte B; i dati mancanti sono evidenziati e
+  il testo si stampa o si salva in PDF.
 - **Impostazioni**: la propria password, argomenti delle ore (rinominarli aggiorna anche le ore
   già registrate), numero di studi pilota, categorie di spesa, indirizzo
   del programma da mandare ai soci.

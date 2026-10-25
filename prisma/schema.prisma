@@ -12,22 +12,29 @@ datasource db {
 
 // Socio o collaboratore allo sviluppo. Con nome utente e password può entrare nel programma.
 model Partner {
-  id                 String   @id @default(cuid())
+  id                 String         @id @default(cuid())
   name               String
-  username           String?  @unique
+  username           String?        @unique
   passwordHash       String?
   // Password provvisoria scelta dall'amministratore: al primo accesso il socio deve cambiarla.
-  mustChangePassword Boolean  @default(false)
+  mustChangePassword Boolean        @default(false)
   // Solo per preparare l'email con le credenziali.
   email              String?
-  isAdmin            Boolean  @default(false)
-  active             Boolean  @default(true)
+  isAdmin            Boolean        @default(false)
+  active             Boolean        @default(true)
   // Quota di partecipazione alle spese, in centesimi di punto (5000 = 50%).
-  shareBasisPoints   Int      @default(0)
+  shareBasisPoints   Int            @default(0)
   // Costo orario usato per valorizzare le ore di lavoro.
-  hourlyRateCents    Int      @default(0)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  hourlyRateCents    Int            @default(0)
+  // Dati per l'accordo tra soci: li compila ogni socio dalla pagina "Accordo".
+  taxCode            String?
+  birthPlace         String?
+  birthDate          DateTime?      @db.Date
+  residence          String?
+  // Parte nell'accordo (A sviluppo, B commerciale); la sceglie l'amministratore.
+  agreementRole      AgreementRole? @unique
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   sessions        Session[]
   expensesPaid    Expense[]           @relation("ExpensePaidBy")
@@ -39,6 +46,11 @@ model Partner {
   approvals       ExpenseApproval[]
   expenseMessages ExpenseMessage[]
   timeApprovals   TimeEntryApproval[]
+}
+
+enum AgreementRole {
+  A
+  B
 }
 
 model Session {
