@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { settlePendingExpenses } from "@/modules/expenses/service";
+import { applyRateToUnpricedEntries, settlePendingTimeEntries } from "@/modules/time/service";
 
 export type PartnerInput = {
   name: string;
@@ -48,12 +49,18 @@ export async function createPartner(
   });
 }
 
+// Restituisce quante ore registrate a 0 € hanno preso il nuovo costo orario.
 export async function updatePartner(id: string, input: PartnerInput) {
   await prisma.partner.update({ where: { id }, data: input });
+  const repriced = await applyRateToUnpricedEntries(id, input.hourlyRateCents);
   // Un socio disattivato esce subito da tutti i dispositivi.
   if (!input.active) await prisma.session.deleteMany({ where: { partnerId: id } });
   // Chi non può più entrare non deve più approvare: le spese che aspettavano solo lui passano.
-  if (!input.active || !input.username) await settlePendingExpenses();
+  if (!input.active || !input.username) {
+    await settlePendingExpenses();
+    await settlePendingTimeEntries();
+  }
+  return repriced;
 }
 
 export async function setPassword(

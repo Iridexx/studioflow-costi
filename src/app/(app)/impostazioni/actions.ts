@@ -17,6 +17,9 @@ import {
 } from "@/modules/mail/service";
 import { normalizeAppUrl } from "@/modules/partners/invite";
 import { setAppUrl, setPilotStudios } from "@/modules/settings/service";
+import { saveDigestSettings, sendDigest } from "@/modules/digest/service";
+import { formatTime, parseTime, romeClock } from "@/modules/digest/schedule";
+import { createTopic, topicNameTaken, updateTopic } from "@/modules/time/service";
 
 export async function changeMyPassword(_: FormState, form: FormData): Promise<FormState> {
   const me = await requirePartner();
@@ -128,4 +131,54 @@ export async function removeMailSetup(): Promise<FormState> {
   await deleteMailSettings();
   revalidatePath("/", "layout");
   return { ok: "Invio delle email disattivato." };
+}
+
+// Argomenti delle ore: li gestisce ogni socio, come quando li scrive registrando le ore.
+export async function addTopic(_: FormState, form: FormData): Promise<FormState> {
+  await requirePartner();
+  return handle(async () => {
+    const name = requiredText(form, "name", "Argomento");
+    if (await topicNameTaken(name)) throw new FormError("Questo argomento c'è già.");
+    await createTopic(name);
+    revalidatePath("/", "layout");
+    return `Argomento "${name}" aggiunto.`;
+  });
+}
+
+export async function editTopic(id: string, _: FormState, form: FormData): Promise<FormState> {
+  await requirePartner();
+  return handle(async () => {
+    const name = requiredText(form, "name", "Argomento");
+    if (await topicNameTaken(name, id)) throw new FormError("Questo argomento c'è già.");
+    await updateTopic(id, { name, active: checkbox(form, "active") });
+    revalidatePath("/", "layout");
+    return "Salvato.";
+  });
+}
+
+export async function saveDigest(_: FormState, form: FormData): Promise<FormState> {
+  await requireAdmin();
+  return handle(async () => {
+    const minutes = parseTime(text(form, "time"));
+    if (minutes === null) throw new FormError("Indica un orario valido, es. 23:55.");
+    const enabled = checkbox(form, "enabled");
+    await saveDigestSettings(enabled, formatTime(minutes));
+    revalidatePath("/", "layout");
+    return enabled
+      ? `Salvato: il riepilogo parte alle ${formatTime(minutes)} nei giorni con novità.`
+      : "Riepilogo giornaliero disattivato.";
+  });
+}
+
+// Per provarlo: spedisce subito il riepilogo di quanto inserito oggi, senza cambiare l'invio serale.
+export async function sendDigestNow(): Promise<FormState> {
+  await requireAdmin();
+  const now = new Date();
+  const clock = romeClock(now);
+  const since = new Date(now.getTime() - (clock.minutes + 1) * 60 * 1000);
+  try {
+    return { ok: await sendDigest(clock.day, since, now) };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Invio non riuscito." };
+  }
 }

@@ -1,3 +1,4 @@
+import { TopicSelect } from "@/components/topic-select";
 import { Field, inputClass } from "@/components/ui";
 import { dayInput, hoursInput } from "@/lib/format";
 
@@ -51,19 +52,8 @@ export function TimeFields({
           className={inputClass}
         />
       </Field>
-      <Field label="Argomento" hint="es. Pratiche, Archivio, Riunione">
-        <input
-          name="topic"
-          required
-          list="argomenti"
-          defaultValue={defaults?.topic}
-          className={inputClass}
-        />
-        <datalist id="argomenti">
-          {topics.map((t) => (
-            <option key={t} value={t} />
-          ))}
-        </datalist>
+      <Field label="Argomento" hint="Uno nuovo si aggiunge al menu; si modificano in Impostazioni">
+        <TopicSelect topics={topics} defaultValue={defaults?.topic} />
       </Field>
       <div className="sm:col-span-2 lg:col-span-4">
         <Field label="Note">
