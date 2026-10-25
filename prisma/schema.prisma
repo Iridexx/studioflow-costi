@@ -46,6 +46,8 @@ model Partner {
   approvals       ExpenseApproval[]
   expenseMessages ExpenseMessage[]
   timeApprovals   TimeEntryApproval[]
+  agreementEdits  AgreementVersion[]
+  agreementOks    AgreementApproval[]
 }
 
 enum AgreementRole {
@@ -195,4 +197,33 @@ model TimeTopic {
   name     String  @unique
   position Int     @default(0)
   active   Boolean @default(true)
+}
+
+// Versioni dell'accordo tra soci. Ogni modifica salva una versione nuova (le precedenti restano
+// com'erano); la prima nasce da docs/accordo-soci.md. Quando tutti i soci con accesso hanno
+// convalidato l'ultima versione, questa diventa definitiva e il testo non si modifica più.
+model AgreementVersion {
+  id          String              @id @default(cuid())
+  number      Int                 @unique
+  text        String
+  // Cosa è cambiato, scritto da chi ha salvato la versione.
+  note        String
+  // Vuoto per la prima versione, presa dal file.
+  authorId    String?
+  author      Partner?            @relation(fields: [authorId], references: [id])
+  createdAt   DateTime            @default(now())
+  finalizedAt DateTime?
+  approvals   AgreementApproval[]
+}
+
+// "Convalido" di un socio su una versione. Chi salva una versione la convalida in automatico.
+model AgreementApproval {
+  id        String           @id @default(cuid())
+  versionId String
+  version   AgreementVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  partnerId String
+  partner   Partner          @relation(fields: [partnerId], references: [id])
+  createdAt DateTime         @default(now())
+
+  @@unique([versionId, partnerId])
 }

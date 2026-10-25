@@ -3,13 +3,15 @@ import Link from "next/link";
 import { requirePartner } from "@/lib/session";
 import { countExpensesWaitingFor } from "@/modules/expenses/service";
 import { countTimeEntriesWaitingFor } from "@/modules/time/service";
+import { countAgreementWaitingFor } from "@/modules/agreement/service";
 import { signOut } from "../(auth)/actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const partner = await requirePartner();
-  const [waiting, waitingTime] = await Promise.all([
+  const [waiting, waitingTime, waitingAgreement] = await Promise.all([
     countExpensesWaitingFor(partner.id),
     countTimeEntriesWaitingFor(partner.id),
+    countAgreementWaitingFor(partner.id),
   ]);
   return (
     <div className="min-h-screen">
@@ -49,6 +51,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               : `${waitingTime} registrazioni di ore aspettano la tua conferma.`}{" "}
             <Link href="/ore" className="font-medium underline">
               Vai alle ore
+            </Link>
+          </p>
+        </div>
+      )}
+      {waitingAgreement > 0 && (
+        <div className="border-b border-amber-200 bg-amber-50 print:hidden">
+          <p className="mx-auto max-w-6xl px-4 py-2 text-sm text-amber-900">
+            Una nuova versione dell&apos;accordo tra soci aspetta la tua convalida.{" "}
+            <Link href="/accordo" className="font-medium underline">
+              Vedi cosa è cambiato
             </Link>
           </p>
         </div>

@@ -1,11 +1,15 @@
+import Link from "next/link";
 import { ActionForm } from "@/components/action-form";
+import { AgreementDiff } from "@/components/agreement-diff";
+import { AgreementStatus } from "@/components/agreement-status";
 import { AgreementText } from "@/components/agreement-text";
 import { PrintButton } from "@/components/print-button";
 import { Card, Field, PageTitle, inputClass } from "@/components/ui";
-import { dayInput } from "@/lib/format";
+import { dayInput, formatDay } from "@/lib/format";
 import { requirePartner } from "@/lib/session";
 import { missingFields, parseAgreement } from "@/modules/agreement/render";
-import { getAgreementParties, loadAgreementText } from "@/modules/agreement/service";
+import { describeSummary, diffAgreement, summarize } from "@/modules/agreement/diff";
+import { getAgreementParties, getLatestVersion, listVersions } from "@/modules/agreement/service";
 import { listPartners } from "@/modules/partners/service";
 import { saveAgreementData, saveAgreementRoles } from "./actions";
 
@@ -49,11 +53,15 @@ function DataForm({ partner }: { partner: PartnerRow }) {
 
 export default async function AgreementPage() {
   const me = await requirePartner();
-  const [partners, parties, text] = await Promise.all([
+  const [partners, parties, latest, versions] = await Promise.all([
     listPartners({ onlyActive: true }),
     getAgreementParties(),
-    loadAgreementText(),
+    getLatestVersion(),
+    listVersions(),
   ]);
+  const { version } = latest;
+  const previous = versions.find((v) => v.number < version.number);
+  const changes = previous ? diffAgreement(previous.text, version.text) : [];
   const mine = partners.find((p) => p.id === me.id);
   const others = partners.filter((p) => p.id !== me.id);
   const missing = missingFields(parties);
@@ -66,8 +74,27 @@ export default async function AgreementPage() {
       <div className="print:hidden">
         <PageTitle
           title="Accordo tra i soci"
-          subtitle="Bozza dell'accordo con i dati dei soci. Ognuno inserisce qui i propri dati e il testo si aggiorna da solo."
+          subtitle="Bozza dell'accordo con i dati dei soci. Ognuno inserisce qui i propri dati e può proporre modifiche al testo."
         />
+        <div className="mb-6 space-y-6">
+          <AgreementStatus {...latest} meId={me.id} />
+          {previous && (
+            <Card title={`Cosa è cambiato rispetto alla versione ${previous.number}`}>
+              <p className="mb-4 text-sm text-slate-500">
+                {describeSummary(summarize(changes))}. Il resto del testo è uguale.
+              </p>
+              <AgreementDiff groups={changes} />
+            </Card>
+          )}
+          {!version.finalizedAt && (
+            <Link
+              href="/accordo/modifica"
+              className="inline-block rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            >
+              Modifica il testo
+            </Link>
+          )}
+        </div>
         <div className="mb-6 grid gap-6 lg:grid-cols-2">
           <Card title="Cosa manca">
             {complete ? (
@@ -147,7 +174,23 @@ export default async function AgreementPage() {
         <div className="mb-4 flex justify-end">
           <PrintButton label="Stampa o salva in PDF" />
         </div>
-        <AgreementText blocks={parseAgreement(text, parties)} />
+        <AgreementText blocks={parseAgreement(version.text, parties)} />
+      </Card>
+      <Card title="Tutte le versioni" className="mt-6 print:hidden">
+        <ul className="divide-y divide-slate-100 text-sm">
+          {versions.map((v) => (
+            <li key={v.id} className="py-2">
+              <Link href={`/accordo/versioni/${v.number}`} className="font-medium hover:underline">
+                Versione {v.number}
+              </Link>{" "}
+              <span className="text-slate-500">
+                · {formatDay(v.createdAt)} · {v.author?.name ?? "bozza iniziale"}
+                {v.finalizedAt ? " · definitiva" : ""}
+              </span>
+              <p className="text-slate-700">{v.note}</p>
+            </li>
+          ))}
+        </ul>
       </Card>
     </>
   );
