@@ -28,6 +28,7 @@ import {
   usernameTaken,
   type PartnerInput,
 } from "@/modules/partners/service";
+import { isMailConfigured, sendMail } from "@/modules/mail/service";
 import { buildInvite } from "@/modules/partners/invite";
 
 async function readPartner(form: FormData, exceptId?: string): Promise<PartnerInput> {
@@ -60,9 +61,16 @@ function readNewPassword(form: FormData): string | null {
   return password;
 }
 
-// Email già compilata con le credenziali provvisorie, da mandare dalla propria casella.
-async function inviteFor(input: PartnerInput, password: string, me: CurrentPartner) {
-  return buildInvite({
+// Manda al socio le credenziali provvisorie. Se l'invio è impostato e il socio ha un'email parte
+// subito dal programma; altrimenti (o se l'invio non riesce) si mostra l'email già pronta da
+// mandare a mano.
+async function deliverInvite(
+  input: PartnerInput,
+  password: string,
+  me: CurrentPartner,
+  done: string,
+): Promise<FormState> {
+  const invite = buildInvite({
     name: input.name,
     email: input.email,
     username: input.username ?? "",
@@ -70,6 +78,27 @@ async function inviteFor(input: PartnerInput, password: string, me: CurrentPartn
     appUrl: await appUrlForPartners(),
     senderName: me.name,
   });
+  if (!input.email) return { ok: `${done} Non ha un'email: manda tu queste credenziali.`, invite };
+  if (!(await isMailConfigured()))
+    return {
+      ok: `${done} Per spedire le credenziali direttamente dal programma imposta la tua casella in Impostazioni → Invio email; per ora puoi mandarle da qui.`,
+      invite,
+    };
+  if (invite.localAddress)
+    return {
+      ok: `${done} Email non spedita: l'indirizzo del programma è "localhost", che dal PC del socio non funziona. Salvalo in Impostazioni → Indirizzo per i soci, oppure correggilo qui e mandala.`,
+      invite,
+    };
+  try {
+    await sendMail({ to: input.email, subject: invite.subject, text: invite.body });
+  } catch (error) {
+    return {
+      ok: done,
+      error: `Email non spedita. ${error instanceof Error ? error.message : ""}`,
+      invite,
+    };
+  }
+  return { ok: `${done} Email con le credenziali spedita a ${input.email}.` };
 }
 
 // Solo un amministratore aggiunge soci. La password che sceglie è provvisoria: il socio la
@@ -83,10 +112,12 @@ export async function addPartner(_: FormState, form: FormData): Promise<FormStat
     await createPartner(input, password, { temporary: true });
     revalidatePath("/", "layout");
     if (!password) return `${input.name} aggiunto.`;
-    return {
-      ok: `${input.name} aggiunto. Al primo accesso dovrà cambiare la password.`,
-      invite: await inviteFor(input, password, me),
-    };
+    return deliverInvite(
+      input,
+      password,
+      me,
+      `${input.name} aggiunto: al primo accesso dovrà cambiare la password.`,
+    );
   });
 }
 
@@ -106,10 +137,12 @@ export async function editPartner(id: string, _: FormState, form: FormData): Pro
     revalidatePath("/", "layout");
     if (self && (password || !input.active)) redirect("/accedi");
     if (!password) redirect("/soci");
-    return {
-      ok: `Salvato. Al prossimo accesso ${input.name} dovrà cambiare la password.`,
-      invite: await inviteFor(input, password, me),
-    };
+    return deliverInvite(
+      input,
+      password,
+      me,
+      `Salvato: al prossimo accesso ${input.name} dovrà cambiare la password.`,
+    );
   });
 }
 
@@ -139,4 +172,23 @@ export async function removeContribution(id: string): Promise<FormState> {
   await deleteContribution(id);
   revalidatePath("/", "layout");
   return { ok: "Versamento eliminato." };
+}
+
+// Dal riquadro dell'email pronta: spedisce il testo (eventualmente corretto) dal programma.
+export async function sendInviteEmail(
+  to: string,
+  subject: string,
+  body: string,
+): Promise<FormState> {
+  await requireAdmin();
+  const address = to.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) return { error: "Scrivi l'email del socio." };
+  if (!(await isMailConfigured()))
+    return { error: "Prima imposta la tua casella in Impostazioni → Invio email." };
+  try {
+    await sendMail({ to: address, subject, text: body });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Invio non riuscito." };
+  }
+  return { ok: `Email spedita a ${address}.` };
 }

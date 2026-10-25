@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { sendInviteEmail } from "@/app/(app)/soci/actions";
+import type { FormState } from "@/components/action-form";
 import { gmailUrl, mailtoUrl, type Invite } from "@/modules/partners/invite";
 
 // Copia negli appunti anche da http://IP, dove il browser non permette navigator.clipboard.
@@ -30,6 +32,8 @@ export function InviteBox({ invite }: { invite: Invite }) {
   const [to, setTo] = useState(invite.to ?? "");
   const [body, setBody] = useState(invite.body);
   const [copied, setCopied] = useState<boolean | null>(null);
+  const [sent, setSent] = useState<FormState>({});
+  const [sending, startSending] = useTransition();
 
   async function copy() {
     const text = `Oggetto: ${invite.subject}\n\n${body}`;
@@ -71,6 +75,16 @@ export function InviteBox({ invite }: { invite: Invite }) {
         />
       </label>
       <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={sending}
+          onClick={() =>
+            startSending(async () => setSent(await sendInviteEmail(to, invite.subject, body)))
+          }
+          className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60"
+        >
+          {sending ? "Invio…" : "Invia dal programma"}
+        </button>
         <a href={mailtoUrl(to.trim() || null, invite.subject, body)} className={buttonClass}>
           Apri nel programma di posta
         </a>
@@ -86,13 +100,15 @@ export function InviteBox({ invite }: { invite: Invite }) {
           Copia il messaggio
         </button>
       </div>
+      {sent.ok && <p className="text-emerald-700">{sent.ok}</p>}
+      {sent.error && <p className="text-red-700">{sent.error}</p>}
       {copied === true && <p className="text-emerald-700">Messaggio copiato.</p>}
       {copied === false && (
         <p className="text-red-700">Non riesco a copiare: seleziona il testo e copialo a mano.</p>
       )}
       <p className="text-xs text-slate-500">
-        L&apos;email parte dalla tua casella, non dal programma. La password non viene salvata in
-        chiaro: se chiudi questa pagina senza inviarla, ne imposti una nuova da Modifica.
+        La password non viene salvata in chiaro: se chiudi questa pagina senza inviarla, ne imposti
+        una nuova da Modifica.
       </p>
     </div>
   );

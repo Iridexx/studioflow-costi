@@ -58,10 +58,15 @@ ferma). Al primo accesso da http://localhost:3100 si crea l'utente amministrator
 ### Aggiungere un socio
 
 Solo un amministratore. In **Soci e versamenti → Aggiungi un socio** scrivi nome, nome utente,
-email e una password provvisoria (o premi **Genera**). Dopo il salvataggio compare l'email già
-pronta con indirizzo, nome utente e password: **Apri nel programma di posta**, **Apri in Gmail**
-oppure **Copia il messaggio**. L'email parte dalla tua casella, il programma non spedisce nulla.
-Al primo accesso il socio deve scegliere una password sua prima di poter fare altro.
+email e una password provvisoria (o premi **Genera**). Il programma spedisce subito al socio
+l'email con indirizzo, nome utente e password; al primo accesso il socio deve sceglierne una sua
+prima di poter fare altro.
+
+Per spedire serve impostare una volta la tua casella in **Impostazioni → Invio email**: email,
+servizio (Gmail, Aruba, Libero o altro) e password. Con Gmail serve una "password per le app"
+(da myaccount.google.com/apppasswords, con la verifica in due passaggi attiva). Al salvataggio il
+programma ti manda un'email di prova: se non parte, te lo dice e non salva. Finché l'invio non è
+impostato, o se non riesce, compare l'email già pronta da spedire con un clic o da copiare.
 
 Perché l'indirizzo nell'email sia giusto, salvalo una volta in **Impostazioni → Indirizzo per i
 soci** (es. `http://nome-pc:3100`); se apri il programma da `localhost` te lo ricorda.

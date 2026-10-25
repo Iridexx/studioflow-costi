@@ -3,21 +3,26 @@ import { Card, Field, PageTitle, inputClass } from "@/components/ui";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 import { requirePartner } from "@/lib/session";
 import { listCategories } from "@/modules/expenses/service";
+import { MailSettingsForm } from "@/components/mail-settings-form";
+import { getMailSettings } from "@/modules/mail/service";
 import { getAppUrl, getPilotStudios } from "@/modules/settings/service";
 import {
   addCategory,
   changeMyPassword,
   editCategory,
+  removeMailSetup,
   saveAppUrl,
+  saveMailSetup,
   savePilotStudios,
 } from "./actions";
 
 export default async function SettingsPage() {
   const me = await requirePartner();
-  const [categories, pilotStudios, appUrl] = await Promise.all([
+  const [categories, pilotStudios, appUrl, mail] = await Promise.all([
     listCategories(),
     getPilotStudios(),
     getAppUrl(),
+    getMailSettings(),
   ]);
   return (
     <>
@@ -71,6 +76,43 @@ export default async function SettingsPage() {
                 />
               </Field>
             </ActionForm>
+          </Card>
+        )}
+
+        {me.isAdmin && (
+          <Card title="Invio email">
+            <p className="mb-4 text-sm text-slate-500">
+              {mail
+                ? `Attivo: le email partono da ${mail.user}.`
+                : "Imposta una volta la tua casella e il programma spedirà da solo le credenziali ai nuovi soci."}
+            </p>
+            <MailSettingsForm
+              action={saveMailSetup}
+              current={
+                mail
+                  ? {
+                      provider: mail.provider,
+                      host: mail.host,
+                      port: mail.port,
+                      user: mail.user,
+                      fromName: mail.fromName,
+                    }
+                  : null
+              }
+            />
+            {mail && (
+              <details className="mt-4">
+                <summary className="cursor-pointer text-xs text-slate-500">
+                  Disattiva l&apos;invio
+                </summary>
+                <ActionForm
+                  action={removeMailSetup}
+                  submitLabel="Disattiva l'invio delle email"
+                  className="mt-2 space-y-2"
+                  danger
+                />
+              </details>
+            )}
           </Card>
         )}
 
