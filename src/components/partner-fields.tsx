@@ -1,9 +1,13 @@
+import { SharesFields } from "@/components/shares-fields";
 import { Field, inputClass } from "@/components/ui";
 import { euroInput } from "@/lib/format";
 
 export function PartnerFields({
   defaults,
+  others,
 }: {
+  // Gli altri soci, per ricalcolare le loro quote e tenere il totale al 100%.
+  others: { id: string; name: string; shareBasisPoints: number; active: boolean }[];
   defaults?: {
     name: string;
     username: string | null;
@@ -36,14 +40,17 @@ export function PartnerFields({
           className={inputClass}
         />
       </Field>
-      <Field label="Quota delle spese %" hint="es. 50 per metà">
-        <input
-          name="share"
-          inputMode="decimal"
-          defaultValue={defaults ? String(defaults.shareBasisPoints / 100).replace(".", ",") : ""}
-          className={inputClass}
-        />
-      </Field>
+      <SharesFields
+        // Dopo un salvataggio le quote degli altri cambiano: si riparte dai valori nuovi.
+        key={others.map((o) => `${o.id}:${o.shareBasisPoints}`).join(",")}
+        defaultShare={defaults?.shareBasisPoints ?? 0}
+        others={others.map((o) => ({
+          id: o.id,
+          name: o.name,
+          share: o.shareBasisPoints,
+          active: o.active,
+        }))}
+      />
       <Field label="Costo orario €" hint="Per valorizzare le ore di lavoro">
         <input
           name="hourlyRate"

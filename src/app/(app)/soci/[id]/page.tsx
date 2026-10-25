@@ -6,13 +6,13 @@ import { TemporaryPasswordField } from "@/components/temporary-password-field";
 import { Card, Field, PageTitle, inputClass } from "@/components/ui";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 import { requireAdmin } from "@/lib/session";
-import { getPartner } from "@/modules/partners/service";
+import { getPartner, listPartners } from "@/modules/partners/service";
 import { editPartner } from "../actions";
 
 export default async function PartnerPage({ params }: { params: Promise<{ id: string }> }) {
   const me = await requireAdmin();
   const { id } = await params;
-  const partner = await getPartner(id);
+  const [partner, partners] = await Promise.all([getPartner(id), listPartners()]);
   if (!partner) notFound();
   return (
     <>
@@ -22,7 +22,7 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
       <PageTitle title={partner.name} />
       <Card>
         <ActionForm action={editPartner.bind(null, id)} submitLabel="Salva" resetOnSuccess={false}>
-          <PartnerFields defaults={partner} />
+          <PartnerFields defaults={partner} others={partners.filter((p) => p.id !== id)} />
           {partner.id === me.id ? (
             <Field
               label="Nuova password"

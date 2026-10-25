@@ -41,8 +41,8 @@ export default async function PartnersPage() {
       <Card title="Saldo tra soci" className="mb-6">
         {summary.sharesTotal !== 10000 && (
           <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Le quote dei soci sommano a {formatPercent(summary.sharesTotal)} invece di 100%:
-            correggile qui sotto perché il saldo torni.
+            Le quote dei soci sommano a {formatPercent(summary.sharesTotal)} invece di 100%: apri un
+            socio con Modifica e salva, il programma ricalcola le quote degli altri.
           </p>
         )}
         <div className="overflow-x-auto">
@@ -199,7 +199,7 @@ export default async function PartnersPage() {
       {me.isAdmin && (
         <Card title="Aggiungi un socio (solo amministratori)">
           <ActionForm action={addPartner} submitLabel="Aggiungi socio">
-            <PartnerFields />
+            <PartnerFields others={partners} />
             <TemporaryPasswordField
               label="Password provvisoria"
               hint={`Almeno ${MIN_PASSWORD_LENGTH} caratteri, scrivila tu o premi Genera. Dopo il salvataggio prepari l'email per il socio; al primo accesso dovrà sceglierne una sua.`}

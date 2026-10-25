@@ -16,20 +16,23 @@ import {
   text,
 } from "@/lib/form";
 import { appUrlForPartners } from "@/lib/app-url";
-import { parseEuro } from "@/lib/format";
+import { parseEuro, parsePercent } from "@/lib/format";
 import { passwordProblem } from "@/lib/password";
 import { requireAdmin, requirePartner, type CurrentPartner } from "@/lib/session";
 import { createContribution, deleteContribution } from "@/modules/contributions/service";
 import {
   countAdmins,
   createPartner,
+  listPartners,
   setPassword,
+  setShares,
   updatePartner,
   usernameTaken,
   type PartnerInput,
 } from "@/modules/partners/service";
 import { isMailConfigured, sendMail } from "@/modules/mail/service";
 import { buildInvite } from "@/modules/partners/invite";
+import { sharesProblem } from "@/modules/partners/shares";
 
 async function readPartner(form: FormData, exceptId?: string): Promise<PartnerInput> {
   const username = text(form, "username").toLowerCase() || null;
@@ -51,6 +54,22 @@ async function readPartner(form: FormData, exceptId?: string): Promise<PartnerIn
     isAdmin: checkbox(form, "isAdmin"),
     active: checkbox(form, "active"),
   };
+}
+
+// Quote degli altri soci dal modulo (chi non c'è tiene la sua): insieme alla quota del socio
+// salvato devono fare 100%.
+async function readOtherShares(form: FormData, own: number, exceptId?: string) {
+  const others = (await listPartners()).filter((p) => p.id !== exceptId);
+  const shares = others.map((p) => {
+    const raw = form.get(`share_${p.id}`);
+    if (raw === null) return { id: p.id, share: p.shareBasisPoints, changed: false };
+    const value = parsePercent(String(raw));
+    if (value === null) throw new FormError(`Quota di ${p.name} non valida.`);
+    return { id: p.id, share: value, changed: value !== p.shareBasisPoints };
+  });
+  const problem = sharesProblem([own, ...shares.map((s) => s.share)]);
+  if (problem) throw new FormError(others.length === 0 ? "Da solo, la tua quota è 100%." : problem);
+  return shares.filter((s) => s.changed).map(({ id, share }) => ({ id, share }));
 }
 
 function readNewPassword(form: FormData): string | null {
@@ -107,9 +126,11 @@ export async function addPartner(_: FormState, form: FormData): Promise<FormStat
   const me = await requireAdmin();
   return handle(async () => {
     const input = await readPartner(form);
+    const otherShares = await readOtherShares(form, input.shareBasisPoints);
     const password = readNewPassword(form);
     if (password && !input.username) throw new FormError("Per la password serve un nome utente.");
     await createPartner(input, password, { temporary: true });
+    await setShares(otherShares);
     revalidatePath("/", "layout");
     if (!password) return `${input.name} aggiunto.`;
     return deliverInvite(
@@ -125,12 +146,14 @@ export async function editPartner(id: string, _: FormState, form: FormData): Pro
   const me = await requireAdmin();
   return handle(async () => {
     const input = await readPartner(form, id);
+    const otherShares = await readOtherShares(form, input.shareBasisPoints, id);
     const password = readNewPassword(form);
     // Deve restare almeno un amministratore che può entrare.
     if ((!input.isAdmin || !input.active || !input.username) && (await countAdmins(id)) === 0)
       throw new FormError("Deve restare almeno un amministratore attivo con nome utente.");
     if (password && !input.username) throw new FormError("Per la password serve un nome utente.");
     await updatePartner(id, input);
+    await setShares(otherShares);
     const self = id === me.id;
     // La propria password è definitiva; quella data a un altro socio è provvisoria.
     if (password) await setPassword(id, password, { temporary: !self });
