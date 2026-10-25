@@ -81,9 +81,11 @@ export default async function AgreementPage() {
           {previous && (
             <Card title={`Cosa è cambiato rispetto alla versione ${previous.number}`}>
               <p className="mb-4 text-sm text-slate-500">
-                {describeSummary(summarize(changes))}. Il resto del testo è uguale.
+                {changes.length > 0
+                  ? `${describeSummary(summarize(changes))}. Il resto del testo è uguale.`
+                  : "Il testo è lo stesso della versione precedente."}
               </p>
-              <AgreementDiff groups={changes} />
+              {changes.length > 0 && <AgreementDiff groups={changes} />}
             </Card>
           )}
           {!version.finalizedAt && (
@@ -185,7 +187,11 @@ export default async function AgreementPage() {
               </Link>{" "}
               <span className="text-slate-500">
                 · {formatDay(v.createdAt)} · {v.author?.name ?? "bozza iniziale"}
-                {v.finalizedAt ? " · definitiva" : ""}
+                {v.reopenedAt
+                  ? " · definitiva, poi riaperta"
+                  : v.finalizedAt
+                    ? " · definitiva"
+                    : ""}
               </span>
               <p className="text-slate-700">{v.note}</p>
             </li>

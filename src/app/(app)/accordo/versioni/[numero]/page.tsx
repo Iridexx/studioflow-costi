@@ -61,9 +61,11 @@ export default async function AgreementVersionPage({
         {previous ? (
           <Card title={`Cosa è cambiato rispetto alla versione ${previous.number}`}>
             <p className="mb-4 text-sm text-slate-500">
-              {describeSummary(summarize(changes))}. Il resto del testo è uguale.
+              {changes.length > 0
+                ? `${describeSummary(summarize(changes))}. Il resto del testo è uguale.`
+                : "Il testo è lo stesso della versione precedente."}
             </p>
-            <AgreementDiff groups={changes} />
+            {changes.length > 0 && <AgreementDiff groups={changes} />}
           </Card>
         ) : (
           <Card>

@@ -58,7 +58,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {waitingAgreement > 0 && (
         <div className="border-b border-amber-200 bg-amber-50 print:hidden">
           <p className="mx-auto max-w-6xl px-4 py-2 text-sm text-amber-900">
-            Una nuova versione dell&apos;accordo tra soci aspetta la tua convalida.{" "}
+            L&apos;accordo tra soci aspetta una tua risposta (convalida o riapertura).{" "}
             <Link href="/accordo" className="font-medium underline">
               Vedi cosa è cambiato
             </Link>

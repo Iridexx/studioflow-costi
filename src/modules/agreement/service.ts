@@ -23,25 +23,57 @@ const versionInclude = {
   approvals: { include: { partner: { select: { name: true } } }, orderBy: { createdAt: "asc" } },
 } as const;
 
+type Approval = { partnerId: string; kind: "VALIDATE" | "REOPEN" };
+
+// Chi ha convalidato la versione e chi è d'accordo a riaprirla.
+export function approvalsOf<A extends Approval>(approvals: A[], kind: Approval["kind"]) {
+  return approvals.filter((a) => a.kind === kind);
+}
+
+const idsOf = (approvals: Approval[], kind: Approval["kind"]) =>
+  approvalsOf(approvals, kind).map((a) => a.partnerId);
+
 // L'accordo è tra almeno due soci: con uno solo che può entrare resta una bozza. Se un socio non
 // può più entrare (disattivato, senza password) la sua convalida non serve più.
+// Una richiesta di riapertura confermata da tutti crea una versione nuova con lo stesso testo,
+// da modificare e convalidare di nuovo; quella definitiva resta nell'elenco come riaperta.
 async function settle(versionId: string) {
   const [version, approvers] = await Promise.all([
     prisma.agreementVersion.findUnique({ where: { id: versionId }, include: { approvals: true } }),
     listApprovers(),
   ]);
-  if (!version || version.finalizedAt) return;
+  if (!version || approvers.length < 2) return;
+  if (!version.finalizedAt) {
+    if (isFullyApproved(approvers, idsOf(version.approvals, "VALIDATE")))
+      await prisma.agreementVersion.update({
+        where: { id: versionId },
+        data: { finalizedAt: new Date() },
+      });
+    return;
+  }
   if (
-    approvers.length >= 2 &&
-    isFullyApproved(
-      approvers,
-      version.approvals.map((a) => a.partnerId),
-    )
-  )
-    await prisma.agreementVersion.update({
-      where: { id: versionId },
-      data: { finalizedAt: new Date() },
-    });
+    version.reopenRequestedAt &&
+    !version.reopenedAt &&
+    isFullyApproved(approvers, idsOf(version.approvals, "REOPEN"))
+  ) {
+    const requester = approvalsOf(version.approvals, "REOPEN").sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+    )[0];
+    await prisma.$transaction([
+      prisma.agreementVersion.update({
+        where: { id: versionId },
+        data: { reopenedAt: new Date() },
+      }),
+      prisma.agreementVersion.create({
+        data: {
+          number: version.number + 1,
+          text: version.text,
+          note: `Accordo riaperto: ${version.reopenReason}`,
+          authorId: requester?.partnerId,
+        },
+      }),
+    ]);
+  }
 }
 
 export async function getLatestVersion() {
@@ -49,19 +81,21 @@ export async function getLatestVersion() {
   const latest = await prisma.agreementVersion.findFirstOrThrow({ orderBy: { number: "desc" } });
   await settle(latest.id);
   const [version, approvers] = await Promise.all([
-    prisma.agreementVersion.findUniqueOrThrow({
-      where: { id: latest.id },
+    prisma.agreementVersion.findFirstOrThrow({
+      orderBy: { number: "desc" },
       include: versionInclude,
     }),
     listApprovers(),
   ]);
   const missing = version.finalizedAt
     ? []
-    : missingApprovers(
-        approvers,
-        version.approvals.map((a) => a.partnerId),
-      );
-  return { version, missing, approversCount: approvers.length };
+    : missingApprovers(approvers, idsOf(version.approvals, "VALIDATE"));
+  // Con una richiesta di riapertura in corso: chi deve ancora dire di sì.
+  const missingReopen =
+    version.reopenRequestedAt && !version.reopenedAt
+      ? missingApprovers(approvers, idsOf(version.approvals, "REOPEN"))
+      : [];
+  return { version, missing, missingReopen, approversCount: approvers.length };
 }
 
 export async function listVersions() {
@@ -87,7 +121,9 @@ export async function saveAgreementVersion(
 ) {
   const { version: latest } = await getLatestVersion();
   if (latest.finalizedAt)
-    throw new FormError("L'accordo è già stato convalidato da tutti i soci: non si modifica più.");
+    throw new FormError(
+      "L'accordo è definitivo: per modificarlo va prima riaperto con il consenso di tutti i soci.",
+    );
   // Chi modificava una versione vecchia perderebbe le modifiche dell'altro socio.
   if (latest.number !== input.baseNumber)
     throw new FormError(
@@ -113,31 +149,67 @@ export async function saveAgreementVersion(
   return version;
 }
 
-export async function approveAgreementVersion(versionId: string, partnerId: string) {
-  const { version: latest } = await getLatestVersion();
-  if (latest.id !== versionId)
-    throw new FormError("Nel frattempo è stata salvata una versione nuova: convalida quella.");
-  if (latest.finalizedAt) return;
+async function addApproval(versionId: string, partnerId: string, kind: Approval["kind"]) {
   await prisma.agreementApproval.upsert({
-    where: { versionId_partnerId: { versionId, partnerId } },
-    create: { versionId, partnerId },
+    where: { versionId_partnerId_kind: { versionId, partnerId, kind } },
+    create: { versionId, partnerId, kind },
     update: {},
   });
   await settle(versionId);
 }
 
-// 1 se l'ultima versione aspetta la convalida del socio, per l'avviso in alto nelle pagine.
+async function latestOrStale(versionId: string) {
+  const { version } = await getLatestVersion();
+  if (version.id !== versionId)
+    throw new FormError("Nel frattempo l'accordo è cambiato: riapri la pagina.");
+  return version;
+}
+
+export async function approveAgreementVersion(versionId: string, partnerId: string) {
+  const version = await latestOrStale(versionId);
+  if (!version.finalizedAt) await addApproval(versionId, partnerId, "VALIDATE");
+}
+
+export async function requestReopen(versionId: string, partnerId: string, reason: string) {
+  const version = await latestOrStale(versionId);
+  if (!version.finalizedAt) throw new FormError("L'accordo è ancora una bozza: si può modificare.");
+  if (version.reopenRequestedAt) throw new FormError("C'è già una richiesta di riapertura.");
+  await prisma.agreementVersion.update({
+    where: { id: versionId },
+    data: { reopenReason: reason, reopenRequestedAt: new Date() },
+  });
+  await addApproval(versionId, partnerId, "REOPEN");
+}
+
+export async function agreeReopen(versionId: string, partnerId: string) {
+  const version = await latestOrStale(versionId);
+  if (!version.reopenRequestedAt) throw new FormError("Nessuno ha chiesto di riaprire l'accordo.");
+  await addApproval(versionId, partnerId, "REOPEN");
+}
+
+// Chi ha chiesto la riapertura (o chi non è d'accordo) la ritira: l'accordo resta definitivo.
+export async function cancelReopen(versionId: string) {
+  await latestOrStale(versionId);
+  await prisma.$transaction([
+    prisma.agreementApproval.deleteMany({ where: { versionId, kind: "REOPEN" } }),
+    prisma.agreementVersion.update({
+      where: { id: versionId },
+      data: { reopenReason: null, reopenRequestedAt: null },
+    }),
+  ]);
+}
+
+// 1 se l'ultima versione aspetta il socio (convalida o riapertura), per l'avviso in alto.
 export async function countAgreementWaitingFor(partnerId: string) {
   const latest = await prisma.agreementVersion.findFirst({
     orderBy: { number: "desc" },
-    include: { approvals: { select: { partnerId: true } } },
+    include: { approvals: { select: { partnerId: true, kind: true } } },
   });
-  if (!latest || latest.finalizedAt) return 0;
+  if (!latest) return 0;
+  const kind = latest.finalizedAt ? "REOPEN" : "VALIDATE";
+  if (kind === "REOPEN" && !latest.reopenRequestedAt) return 0;
   const approvers = await listApprovers();
-  const waiting = missingApprovers(
-    approvers,
-    latest.approvals.map((a) => a.partnerId),
-  );
+  const waiting = missingApprovers(approvers, idsOf(latest.approvals, kind));
   return waiting.some((p) => p.id === partnerId) ? 1 : 0;
 }
 

@@ -54,7 +54,7 @@ Le responsabilità sopra indicate descrivono i ruoli principali e non escludono 
 
 ### 2.4 Assistenza ai clienti
 
-L'assistenza ai clienti è svolta dalla Parte A fino a quando i clienti paganti non superano il numero di **20 studi**. Oltre questa soglia, o prima se le parti lo decidono insieme, l'assistenza è affidata a persone incaricate o a strumenti automatici (anche di intelligenza artificiale), il cui costo è una spesa operativa del Progetto. La Parte A resta responsabile dell'assistenza tecnica di secondo livello (difetti del software e problemi che gli incaricati non riescono a risolvere).
+L'assistenza ai clienti è svolta dalla Parte A fino a quando i clienti paganti non superano il numero di **10 studi**. Oltre questa soglia, o prima se le parti lo decidono insieme, l'assistenza è affidata a persone incaricate o a strumenti automatici (anche di intelligenza artificiale), il cui costo è una spesa operativa del Progetto. La Parte A resta responsabile dell'assistenza tecnica di secondo livello (difetti del software e problemi che gli incaricati non riescono a risolvere).
 
 ## Articolo 3 — Quote di partecipazione
 

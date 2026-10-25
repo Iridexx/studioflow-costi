@@ -6,7 +6,10 @@ import type { FormState } from "@/components/action-form";
 import { FormError, handle, optionalDay, optionalText, requiredText, text } from "@/lib/form";
 import { requireAdmin, requirePartner } from "@/lib/session";
 import {
+  agreeReopen,
   approveAgreementVersion,
+  cancelReopen,
+  requestReopen,
   saveAgreementVersion,
   setAgreementRoles,
   updateAgreementData,
@@ -79,5 +82,36 @@ export async function approveVersion(versionId: string): Promise<FormState> {
     await approveAgreementVersion(versionId, me.id);
     revalidatePath("/", "layout");
     return "Hai convalidato questa versione.";
+  });
+}
+
+export async function askReopen(
+  versionId: string,
+  _: FormState,
+  form: FormData,
+): Promise<FormState> {
+  const me = await requirePartner();
+  return handle(async () => {
+    await requestReopen(versionId, me.id, requiredText(form, "reason", "Perché va riaperto"));
+    revalidatePath("/", "layout");
+    return "Richiesta inviata: l'accordo si riapre quando sono d'accordo tutti i soci.";
+  });
+}
+
+export async function acceptReopen(versionId: string): Promise<FormState> {
+  const me = await requirePartner();
+  return handle(async () => {
+    await agreeReopen(versionId, me.id);
+    revalidatePath("/", "layout");
+    return "Fatto.";
+  });
+}
+
+export async function withdrawReopen(versionId: string): Promise<FormState> {
+  await requirePartner();
+  return handle(async () => {
+    await cancelReopen(versionId);
+    revalidatePath("/", "layout");
+    return "Richiesta ritirata: l'accordo resta definitivo.";
   });
 }

@@ -36,7 +36,8 @@ privato; in StudioFlow c'è solo una voce di menu che lo apre, visibile se sul s
   il testo si stampa o si salva in PDF. I soci modificano il testo dal programma: ogni modifica
   salva una versione nuova con chi l'ha fatta e perché, e mostra solo i paragrafi cambiati
   (aggiunte in verde, parti tolte in rosso barrato). Quando tutti i soci con accesso convalidano
-  la stessa versione, l'accordo diventa definitivo e non si modifica più. Il file serve solo per
+  la stessa versione, l'accordo diventa definitivo e non si modifica più; per cambiarlo un socio
+  chiede di riaprirlo spiegando perché e si riapre quando tutti i soci sono d'accordo. Il file serve solo per
   la prima versione: da lì il testo vive nel database.
 - **Impostazioni**: la propria password, argomenti delle ore (rinominarli aggiorna anche le ore
   già registrate), numero di studi pilota, categorie di spesa, indirizzo
