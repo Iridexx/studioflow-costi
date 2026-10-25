@@ -33,6 +33,9 @@ privato; in StudioFlow c'è solo una voce di menu che lo apre, visibile se sul s
 - **Impostazioni**: la propria password, argomenti delle ore (rinominarli aggiorna anche le ore
   già registrate), numero di studi pilota, categorie di spesa, indirizzo
   del programma da mandare ai soci.
+- **Riepilogo giornaliero**: nei giorni in cui vengono inserite spese o ore, i soci con un'email
+  ricevono un riepilogo (di base alle 23:55, orario in Impostazioni). Se il PC server era spento
+  a quell'ora, il riepilogo perso parte alla riaccensione.
 - **Esporta in Excel**: tutti i dati in un file, per il commercialista o per archivio.
 
 Ognuno entra con il proprio nome utente e la propria password, diversa da quella di StudioFlow.

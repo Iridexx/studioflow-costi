@@ -17,6 +17,8 @@ import {
 } from "@/modules/mail/service";
 import { normalizeAppUrl } from "@/modules/partners/invite";
 import { setAppUrl, setPilotStudios } from "@/modules/settings/service";
+import { saveDigestSettings, sendDigest } from "@/modules/digest/service";
+import { formatTime, parseTime, romeClock } from "@/modules/digest/schedule";
 import { createTopic, topicNameTaken, updateTopic } from "@/modules/time/service";
 
 export async function changeMyPassword(_: FormState, form: FormData): Promise<FormState> {
@@ -152,4 +154,31 @@ export async function editTopic(id: string, _: FormState, form: FormData): Promi
     revalidatePath("/", "layout");
     return "Salvato.";
   });
+}
+
+export async function saveDigest(_: FormState, form: FormData): Promise<FormState> {
+  await requireAdmin();
+  return handle(async () => {
+    const minutes = parseTime(text(form, "time"));
+    if (minutes === null) throw new FormError("Indica un orario valido, es. 23:55.");
+    const enabled = checkbox(form, "enabled");
+    await saveDigestSettings(enabled, formatTime(minutes));
+    revalidatePath("/", "layout");
+    return enabled
+      ? `Salvato: il riepilogo parte alle ${formatTime(minutes)} nei giorni con novità.`
+      : "Riepilogo giornaliero disattivato.";
+  });
+}
+
+// Per provarlo: spedisce subito il riepilogo di quanto inserito oggi, senza cambiare l'invio serale.
+export async function sendDigestNow(): Promise<FormState> {
+  await requireAdmin();
+  const now = new Date();
+  const clock = romeClock(now);
+  const since = new Date(now.getTime() - (clock.minutes + 1) * 60 * 1000);
+  try {
+    return { ok: await sendDigest(clock.day, since, now) };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Invio non riuscito." };
+  }
 }
