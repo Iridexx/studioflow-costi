@@ -84,7 +84,9 @@ ferma). Al primo accesso da http://localhost:3100 si crea l'utente amministrator
 Solo un amministratore. In **Soci e versamenti → Aggiungi un socio** scrivi nome, nome utente,
 email e una password provvisoria (o premi **Genera**). Il programma spedisce subito al socio
 l'email con indirizzo, nome utente e password; al primo accesso il socio deve sceglierne una sua
-prima di poter fare altro.
+prima di poter fare altro: ogni pagina, link diretto, azione o download lo riporta al cambio
+password. I soci aggiunti prima della password provvisoria (25/10/2026) la cambiano al prossimo
+accesso, tranne il primo socio che ha creato il programma.
 
 Per spedire serve impostare una volta la tua casella in **Impostazioni → Invio email**: email,
 servizio (Gmail, Aruba, Libero o altro) e password. Con Gmail serve una "password per le app"

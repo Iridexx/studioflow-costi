@@ -3,7 +3,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 
-const COOKIE = "costi_sessione";
+export const SESSION_COOKIE = "costi_sessione";
 const SESSION_DAYS = 30;
 
 export type CurrentPartner = {
@@ -29,7 +29,7 @@ export async function startSession(partnerId: string) {
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
   await prisma.session.create({ data: { tokenHash: hashToken(token), partnerId, expiresAt } });
   const store = await cookies();
-  store.set(COOKIE, token, {
+  store.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: await isHttps(),
@@ -40,13 +40,17 @@ export async function startSession(partnerId: string) {
 
 export async function endSession() {
   const store = await cookies();
-  const token = store.get(COOKIE)?.value;
+  const token = store.get(SESSION_COOKIE)?.value;
   if (token) await prisma.session.deleteMany({ where: { tokenHash: hashToken(token) } });
-  store.delete(COOKIE);
+  store.delete(SESSION_COOKIE);
 }
 
 export async function getCurrentPartner(): Promise<CurrentPartner | null> {
-  const token = (await cookies()).get(COOKIE)?.value;
+  return partnerFromToken((await cookies()).get(SESSION_COOKIE)?.value);
+}
+
+// Usata anche dal proxy (src/proxy.ts), che legge il cookie direttamente dalla richiesta.
+export async function partnerFromToken(token: string | undefined): Promise<CurrentPartner | null> {
   if (!token) return null;
   const session = await prisma.session.findUnique({
     where: { tokenHash: hashToken(token) },
