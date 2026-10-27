@@ -8,6 +8,7 @@ import { RECURRENCE_LABEL } from "@/lib/labels";
 import { requirePartner } from "@/lib/session";
 import { missingApprovers } from "@/modules/expenses/approval";
 import { getExpense, listApprovers, listCategories } from "@/modules/expenses/service";
+import { splitLabel } from "@/modules/expenses/split";
 import { listPartners } from "@/modules/partners/service";
 import { approve, editExpense, removeExpense, sendMessage } from "../actions";
 
@@ -54,6 +55,8 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
           {expense.endDate && ` fino al ${formatDay(expense.endDate)}`} · {expense.category.name} ·
           pagata da {expense.paidBy?.name ?? "cassa comune"}
           {expense.supplier && ` · ${expense.supplier}`}
+          {expense.partyBShareBasisPoints !== null &&
+            ` · costo diviso ${splitLabel(expense.partyBShareBasisPoints)}`}
         </p>
         {expense.notes && <p className="mb-3 text-sm text-slate-600">{expense.notes}</p>}
         {expense.approvedAt ? (

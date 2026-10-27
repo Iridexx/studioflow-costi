@@ -103,6 +103,10 @@ Tutte le spese approvate e registrate, pagate di tasca propria da una parte, son
 
 Il rimborso avviene con i ricavi del Progetto, con la priorità indicata all'articolo 7. Se le parti vogliono trattare una singola spesa in modo diverso (per esempio come contributo non rimborsabile), lo scrivono nelle note della spesa e lo approvano entrambe.
 
+### 4.5 Piano per lo sviluppo del software
+
+Il piano dello strumento di intelligenza artificiale usato per sviluppare il software è pagato per il **70% dalla Parte B** e per il **30% dalla Parte A**, invece che secondo le quote dell'articolo 3. Al momento il piano è **Claude Max**, al costo di **90 euro al mese più IVA**. Se il piano cambia, con l'approvazione di entrambe le parti, la stessa ripartizione vale per il piano che lo sostituisce.
+
 ## Articolo 5 — Ore di lavoro
 
 ### 5.1 Registrazione
