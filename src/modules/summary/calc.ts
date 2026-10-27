@@ -178,3 +178,29 @@ export function partnerBalances(
     partiesMissing: !hasParties && past.some((c) => c.expense.partyBShareBasisPoints != null),
   };
 }
+
+export type Settlement = { from: PartnerLike; to: PartnerLike; cents: number };
+
+// Chi deve dare soldi a chi per pareggiare i saldi: chi è sotto restituisce a chi ha messo di più,
+// a partire dagli importi più grandi.
+export function settlements(balances: PartnerBalance[]): Settlement[] {
+  const debtors = balances
+    .filter((b) => b.balanceCents < 0)
+    .map((b) => ({ partner: b.partner, cents: -b.balanceCents }))
+    .sort((a, b) => b.cents - a.cents);
+  const creditors = balances
+    .filter((b) => b.balanceCents > 0)
+    .map((b) => ({ partner: b.partner, cents: b.balanceCents }))
+    .sort((a, b) => b.cents - a.cents);
+  const result: Settlement[] = [];
+  for (const d of debtors) {
+    for (const c of creditors) {
+      const cents = Math.min(d.cents, c.cents);
+      if (cents <= 0) continue;
+      result.push({ from: d.partner, to: c.partner, cents });
+      d.cents -= cents;
+      c.cents -= cents;
+    }
+  }
+  return result;
+}

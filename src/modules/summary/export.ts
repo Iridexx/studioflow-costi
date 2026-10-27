@@ -4,7 +4,13 @@ import { listContributions } from "@/modules/contributions/service";
 import { listExpenses } from "@/modules/expenses/service";
 import { splitLabel } from "@/modules/expenses/split";
 import { listPartners } from "@/modules/partners/service";
-import { charges, fixedMonthlyCost, forecast, partnerBalances } from "@/modules/summary/calc";
+import {
+  charges,
+  fixedMonthlyCost,
+  forecast,
+  partnerBalances,
+  settlements,
+} from "@/modules/summary/calc";
 import { listTimeEntries } from "@/modules/time/service";
 
 const EURO = '#,##0.00 "€"';
@@ -49,6 +55,8 @@ export async function buildWorkbook(today: Date): Promise<ExcelJS.Workbook> {
   totals.addRow({ label: "Saldo tra soci" }).font = { bold: true };
   for (const b of summary.balances)
     totals.addRow({ label: b.partner.name, value: eur(b.balanceCents) });
+  for (const t of settlements(summary.balances))
+    totals.addRow({ label: `${t.from.name} deve dare a ${t.to.name}`, value: eur(t.cents) });
 
   const chargeSheet = addSheet(workbook, "Addebiti fino a oggi", [
     { header: "Data", key: "date", width: 12, style: { numFmt: DATE } },

@@ -107,9 +107,9 @@ Il rimborso avviene con i ricavi del Progetto, con la priorità indicata all'art
 
 Il piano dello strumento di intelligenza artificiale usato per sviluppare il software è pagato per il **70% dalla Parte B** e per il **30% dalla Parte A**, invece che secondo le quote dell'articolo 3. Al momento il piano è **Claude Max**, al costo di **90 euro al mese più IVA**. Se il piano cambia, con l'approvazione di entrambe le parti, la stessa ripartizione vale per il piano che lo sostituisce.
 
-### 4.6 Spese a carico della Parte B
+### 4.6 Chi paga le spese per ora
 
-Le spese operative sono a carico della Parte B, tranne il piano per lo sviluppo del software, diviso come indicato all'articolo 4.5. Se la Parte A paga di tasca propria una spesa concordata, la Parte B le rimborsa la parte a carico della Parte B. Il programma StudioFlow Costi calcola da solo quanto ciascuna parte deve all'altra. Resta valido l'articolo 4.4 sul rimborso delle spese con i ricavi del Progetto.
+Fino a diverso accordo scritto, le spese operative le paga la Parte B, tranne il piano per lo sviluppo del software, diviso come indicato all'articolo 4.5. Se una parte paga anche la quota che toccava all'altra (per esempio la Parte A paga per comodità l'intero abbonamento del piano), l'altra parte gliela restituisce: il programma StudioFlow Costi calcola da solo quanto ciascuna parte deve dare all'altra. Le spese che ciascuna parte ha sostenuto per la propria quota restano anticipazioni rimborsabili con i ricavi del Progetto, secondo gli articoli 4.4 e 7.
 
 ## Articolo 5 — Ore di lavoro
 

@@ -28,12 +28,12 @@ Il piano dello strumento di intelligenza artificiale usato per sviluppare il sof
   },
   {
     id: "spese-parte-b",
-    title: "Spese a carico della Parte B, rimborsate alla Parte A se le paga lei",
-    note: "Aggiunto l'articolo 4.6: le spese sono a carico della Parte B (tranne il piano per lo sviluppo, art. 4.5); se le paga la Parte A, la Parte B le rimborsa",
-    marker: "Spese a carico della Parte B",
-    section: `### 4.6 Spese a carico della Parte B
+    title: "Per ora le spese le paga la Parte B (tranne il piano per lo sviluppo)",
+    note: "Aggiunto l'articolo 4.6: per ora le spese le paga la Parte B, tranne il piano per lo sviluppo (art. 4.5); chi paga la quota dell'altro se la fa restituire, poi tutto si rimborsa con i ricavi",
+    marker: "Chi paga le spese per ora",
+    section: `### 4.6 Chi paga le spese per ora
 
-Le spese operative sono a carico della Parte B, tranne il piano per lo sviluppo del software, diviso come indicato all'articolo 4.5. Se la Parte A paga di tasca propria una spesa concordata, la Parte B le rimborsa la parte a carico della Parte B. Il programma StudioFlow Costi calcola da solo quanto ciascuna parte deve all'altra. Resta valido l'articolo 4.4 sul rimborso delle spese con i ricavi del Progetto.`,
+Fino a diverso accordo scritto, le spese operative le paga la Parte B, tranne il piano per lo sviluppo del software, diviso come indicato all'articolo 4.5. Se una parte paga anche la quota che toccava all'altra (per esempio la Parte A paga per comodità l'intero abbonamento del piano), l'altra parte gliela restituisce: il programma StudioFlow Costi calcola da solo quanto ciascuna parte deve dare all'altra. Le spese che ciascuna parte ha sostenuto per la propria quota restano anticipazioni rimborsabili con i ricavi del Progetto, secondo gli articoli 4.4 e 7.`,
     before: ["## Articolo 5"],
   },
 ];

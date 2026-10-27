@@ -6,6 +6,7 @@ import {
   forecast,
   monthlyTotals,
   partnerBalances,
+  settlements,
   spentUntil,
   type ExpenseLike,
 } from "./calc";
@@ -141,5 +142,25 @@ describe("riepilogo", () => {
     const r = partnerBalances(partners, items, [], today);
     expect(r.balances[0].balanceCents).toBe(2440);
     expect(r.balances[1].balanceCents).toBe(-2440);
+  });
+
+  it("la Parte A paga tutto Claude: la Parte B le deve il 70%", () => {
+    const partners = [
+      { id: "a", name: "A", shareBasisPoints: 7000, agreementRole: "A" as const },
+      { id: "b", name: "B", shareBasisPoints: 3000, agreementRole: "B" as const },
+    ];
+    const items = [
+      expense({
+        amountCents: 10980,
+        date: d("2026-05-02"),
+        paidById: "a",
+        partyBShareBasisPoints: 7000,
+      }),
+    ];
+    const s = settlements(partnerBalances(partners, items, [], today).balances);
+    expect(s).toHaveLength(1);
+    expect(s[0].from.id).toBe("b");
+    expect(s[0].to.id).toBe("a");
+    expect(s[0].cents).toBe(7686);
   });
 });

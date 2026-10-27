@@ -18,7 +18,7 @@ import { requirePartner } from "@/lib/session";
 import { listContributions } from "@/modules/contributions/service";
 import { listExpenses } from "@/modules/expenses/service";
 import { listPartners } from "@/modules/partners/service";
-import { partnerBalances } from "@/modules/summary/calc";
+import { partnerBalances, settlements } from "@/modules/summary/calc";
 import { addContribution, addPartner, removeContribution } from "./actions";
 
 export default async function PartnersPage() {
@@ -31,6 +31,7 @@ export default async function PartnersPage() {
   const today = todayDay();
   const active = partners.filter((p) => p.active);
   const summary = partnerBalances(partners, expenses, contributions, today);
+  const toSettle = settlements(summary.balances);
 
   return (
     <>
@@ -93,12 +94,21 @@ export default async function PartnersPage() {
           Spese sostenute fino a oggi: <strong>{formatEuro(summary.spentCents)}</strong> · Cassa
           comune: <strong>{formatEuro(summary.cashCents)}</strong>
         </p>
+        {toSettle.length > 0 && (
+          <ul className="mt-3 space-y-1 rounded-md bg-sky-50 px-3 py-2 text-sm text-sky-900">
+            {toSettle.map((t) => (
+              <li key={`${t.from.id}-${t.to.id}`}>
+                <strong>{t.from.name}</strong> deve dare <strong>{formatEuro(t.cents)}</strong> a{" "}
+                <strong>{t.to.name}</strong>
+              </li>
+            ))}
+          </ul>
+        )}
         <p className="mt-1 text-xs text-slate-500">
-          Saldo positivo: ha messo più della sua quota. Negativo: deve ancora mettere la differenza.
-          Come dice l&apos;accordo le spese sono a carico della Parte B (art. 4.6), il piano per lo
-          sviluppo 70% Parte B e 30% Parte A (art. 4.5): se la Parte A ne paga una, il saldo mostra
-          quanto la Parte B le deve rimborsare. Le ore di lavoro non entrano nel saldo: sono nella
-          pagina Ore.
+          Saldo positivo: ha pagato più di quanto gli toccava. Negativo: deve dare la differenza.
+          Per ora le spese le paga la Parte B (art. 4.6), il piano per lo sviluppo 70% Parte B e 30%
+          Parte A (art. 4.5). Quello che ciascuno ha pagato per la sua parte si rimborsa poi con i
+          ricavi (art. 4.4). Le ore di lavoro non entrano nel saldo: sono nella pagina Ore.
         </p>
       </Card>
 
