@@ -51,9 +51,9 @@ export function SharesFields({ defaultShare, others }: { defaultShare: number; o
           className={`${inputClass} max-w-40`}
         />
         <span className="mt-1 block text-xs text-slate-500">
-          Serve solo per le spese divise «Secondo le quote dei soci»: la quota del progetto è quella
-          dell&apos;accordo (art. 3). La somma fa sempre 100%: la differenza si toglie agli altri
-          soci.
+          Serve solo per le spese divise «Secondo le quote dei soci»; per l&apos;accordo la Parte B
+          100%, la Parte A 0% (art. 4.6). La somma fa sempre 100%: la differenza si toglie agli
+          altri soci.
         </span>
       </label>
       {others.length > 0 && (

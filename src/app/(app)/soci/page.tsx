@@ -29,7 +29,7 @@ import { getAgreementTerms } from "@/modules/agreement/service";
 import { listExpenses, listUnapprovedExpenses } from "@/modules/expenses/service";
 import { splitLabel } from "@/modules/expenses/split";
 import { listPartners } from "@/modules/partners/service";
-import { sharesFromAgreement } from "@/modules/partners/shares";
+import { expenseSharesFromAgreement } from "@/modules/partners/shares";
 import {
   hoursByPartner,
   partnerAccounts,
@@ -70,9 +70,9 @@ export default async function PartnersPage() {
   const pendingExpenses = pendingExpensesTotal(unapproved);
   const pendingHours = hoursByPartner(partners, timeEntries).total;
   const shares = terms.shares;
-  // Le quote per dividere le spese "secondo le quote" diverse da quelle dell'accordo: lo si
-  // segnala e l'amministratore decide se allinearle, il programma non le cambia da solo.
-  const sharesToAlign = shares ? sharesFromAgreement(partners, shares) : null;
+  // Le quote per dividere le spese "secondo le quote" diverse dall'accordo (art. 4.6, tutto alla
+  // Parte B): lo si segnala e l'amministratore decide se allinearle, il programma non le cambia.
+  const sharesToAlign = expenseSharesFromAgreement(partners);
   const totals = {
     expenses: sum(accounts.map((a) => a.refundExpensesCents)),
     hours: sum(accounts.map((a) => a.refundHoursCents)),
@@ -108,7 +108,7 @@ export default async function PartnersPage() {
           possono mostrare.
         </Notice>
       )}
-      {sharesToAlign && sharesToAlign.length > 0 && shares && (
+      {sharesToAlign && sharesToAlign.length > 0 && (
         <Notice>
           <p>
             Le <strong>quote per le spese</strong> dei soci (
@@ -116,17 +116,19 @@ export default async function PartnersPage() {
               .filter((p) => p.shareBasisPoints > 0 || p.agreementRole)
               .map((p) => `${p.name} ${formatPercent(p.shareBasisPoints)}`)
               .join(", ")}
-            ) non sono quelle dell&apos;accordo: Parte A {formatPercent(shares.A)}, Parte B{" "}
-            {formatPercent(shares.B)} (art. 3). Oggi contano solo per{" "}
+            ) non seguono l&apos;accordo: per ora le spese le paga tutte la Parte B (art. 4.6),
+            tranne il piano Claude, 70% B e 30% A (art. 4.5), che ha già la sua ripartizione. Le
+            quote 70/30 dell&apos;art. 3 sono quelle del progetto (utili), non delle spese. Le quote
+            per le spese contano solo per{" "}
             {summary.byShareCount === 0
               ? "le spese con «Secondo le quote dei soci», e adesso non ce n'è nessuna: i conti qui sotto sono già giusti"
               : `${summary.byShareCount} ${summary.byShareCount === 1 ? "spesa divisa" : "spese divise"} «Secondo le quote dei soci»`}
-            . Le altre spese si dividono secondo l&apos;accordo (art. 4.5 e 4.6).
+            .
           </p>
           {me.isAdmin ? (
             <ActionForm
               action={alignSharesToAgreement}
-              submitLabel="Usa le quote dell'accordo"
+              submitLabel="Metti le spese tutte alla Parte B"
               className="mt-2 space-y-2"
             />
           ) : (
@@ -439,9 +441,10 @@ export default async function PartnersPage() {
           ))}
         </ul>
         <p className="mt-2 text-xs text-slate-500">
-          La quota del progetto è quella dell&apos;accordo (art. 3): conta per gli utili. La quota
-          per le spese serve solo per le spese divise «Secondo le quote dei soci»; le altre si
-          dividono tra Parte A e Parte B come dice l&apos;accordo.
+          La quota del progetto è quella dell&apos;accordo (art. 3): conta per gli utili, non per le
+          spese. Le spese le paga la Parte B, il piano Claude 70% B e 30% A (art. 4.5 e 4.6): è
+          scritto su ogni spesa. La quota per le spese serve solo per le spese divise «Secondo le
+          quote dei soci».
         </p>
       </Card>
 

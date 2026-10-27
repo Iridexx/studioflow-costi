@@ -32,8 +32,7 @@ import {
 } from "@/modules/partners/service";
 import { isMailConfigured, sendMail } from "@/modules/mail/service";
 import { buildInvite } from "@/modules/partners/invite";
-import { getAgreementTerms } from "@/modules/agreement/service";
-import { sharesFromAgreement, sharesProblem } from "@/modules/partners/shares";
+import { expenseSharesFromAgreement, sharesProblem } from "@/modules/partners/shares";
 
 async function readPartner(form: FormData, exceptId?: string): Promise<PartnerInput> {
   const username = text(form, "username").toLowerCase() || null;
@@ -170,20 +169,17 @@ export async function editPartner(id: string, _: FormState, form: FormData): Pro
   });
 }
 
-// Su richiesta dell'amministratore: le quote delle spese diventano quelle dell'accordo (art. 3).
-// Il programma non le cambia mai da solo.
+// Su richiesta dell'amministratore: le quote per le spese diventano quelle dell'accordo (art.
+// 4.6, tutto alla Parte B). Il programma non le cambia mai da solo.
 export async function alignSharesToAgreement(): Promise<FormState> {
   await requireAdmin();
   return handle(async () => {
-    const { shares } = await getAgreementTerms();
-    if (!shares)
-      throw new FormError("Nell'accordo non trovo le quote dell'articolo 3: controlla il testo.");
-    const changes = sharesFromAgreement(await listPartners(), shares);
+    const changes = expenseSharesFromAgreement(await listPartners());
     if (!changes) throw new FormError("Prima scegli la Parte A e la Parte B nella pagina Accordo.");
-    if (changes.length === 0) return "Le quote sono già quelle dell'accordo.";
+    if (changes.length === 0) return "Le quote per le spese sono già quelle dell'accordo.";
     await setShares(changes);
     revalidatePath("/", "layout");
-    return "Quote aggiornate come nell'accordo.";
+    return "Quote per le spese aggiornate: Parte B 100%, come nell'accordo.";
   });
 }
 
