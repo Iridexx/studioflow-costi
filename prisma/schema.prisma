@@ -45,6 +45,7 @@ model Partner {
   contribCreated  Contribution[]      @relation("ContributionCreatedBy")
   approvals       ExpenseApproval[]
   expenseMessages ExpenseMessage[]
+  attachments     ExpenseAttachment[]
   timeApprovals   TimeEntryApproval[]
   agreementEdits  AgreementVersion[]
   agreementOks    AgreementApproval[]
@@ -108,8 +109,26 @@ model Expense {
   approvedAt     DateTime?
   approvals      ExpenseApproval[]
   messages       ExpenseMessage[]
+  attachments    ExpenseAttachment[]
 
   @@index([date])
+}
+
+// Ricevuta o giustificativo di una spesa (PDF o immagine). Il file sta nel database: così è
+// compreso nel backup notturno e segue il programma se si sposta su un altro PC.
+model ExpenseAttachment {
+  id          String   @id @default(cuid())
+  expenseId   String
+  expense     Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  fileName    String
+  contentType String
+  size        Int
+  data        Bytes
+  createdById String
+  createdBy   Partner  @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([expenseId])
 }
 
 // "Approvo" di un socio su una spesa. Chi la inserisce o la modifica la approva in automatico;

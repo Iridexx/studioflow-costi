@@ -8,6 +8,7 @@ import { chargeDates } from "@/modules/summary/calc";
 import { requirePartner } from "@/lib/session";
 import { listCategories, listExpenses, listPendingExpenses } from "@/modules/expenses/service";
 import { listPartners } from "@/modules/partners/service";
+import { getAttachmentRequired } from "@/modules/settings/service";
 import { addExpense } from "./actions";
 
 export default async function ExpensesPage({
@@ -19,11 +20,12 @@ export default async function ExpensesPage({
   const params = await searchParams;
   const today = todayDay();
   const year = Number(params.anno) || today.getUTCFullYear();
-  const [expenses, pending, categories, partners] = await Promise.all([
+  const [expenses, pending, categories, partners, attachmentRequired] = await Promise.all([
     listExpenses(),
     listPendingExpenses(me.id),
     listCategories(),
     listPartners({ onlyActive: true }),
+    getAttachmentRequired(),
   ]);
   const from = new Date(Date.UTC(year, 0, 1));
   const to = new Date(Date.UTC(year, 11, 31));
@@ -46,7 +48,11 @@ export default async function ExpensesPage({
       />
       <Card title="Nuova spesa" className="mb-6">
         <ActionForm action={addExpense} submitLabel="Salva spesa">
-          <ExpenseFields categories={categories.filter((c) => c.active)} partners={partners} />
+          <ExpenseFields
+            categories={categories.filter((c) => c.active)}
+            partners={partners}
+            attachmentRequired={attachmentRequired}
+          />
         </ActionForm>
       </Card>
 
@@ -68,44 +74,49 @@ export default async function ExpensesPage({
                 </tr>
               </thead>
               <tbody>
-                {pending.map(({ expense: e, missing, mustApprove, mustReply, messages }) => (
-                  <tr key={e.id} className="hover:bg-slate-50">
-                    <td className={`${tdClass} whitespace-nowrap`}>{formatDay(e.date)}</td>
-                    <td className={tdClass}>
-                      <Link
-                        href={`/spese/${e.id}`}
-                        className="font-medium text-slate-900 hover:underline"
-                      >
-                        {e.description}
-                      </Link>
-                      <span className="block text-xs text-slate-500">
-                        {RECURRENCE_LABEL[e.recurrence]}
-                        {messages > 0 && ` · ${messages} messaggi`}
-                      </span>
-                    </td>
-                    <td className={`${tdClass} text-right tabular-nums`}>
-                      {formatEuro(e.amountCents)}
-                    </td>
-                    <td className={tdClass}>{e.createdBy.name}</td>
-                    <td className={tdClass}>
-                      {mustApprove && (
-                        <span className="block font-medium text-amber-700">
-                          Tocca a te approvare
-                        </span>
-                      )}
-                      {mustReply && (
-                        <span className="block font-medium text-sky-700">
-                          C&apos;è una domanda per te
-                        </span>
-                      )}
-                      {!mustApprove && (
+                {pending.map(
+                  ({ expense: e, missing, mustApprove, mustReply, messages, attachments }) => (
+                    <tr key={e.id} className="hover:bg-slate-50">
+                      <td className={`${tdClass} whitespace-nowrap`}>{formatDay(e.date)}</td>
+                      <td className={tdClass}>
+                        <Link
+                          href={`/spese/${e.id}`}
+                          className="font-medium text-slate-900 hover:underline"
+                        >
+                          {e.description}
+                        </Link>
                         <span className="block text-xs text-slate-500">
-                          Manca: {missing.map((p) => p.name).join(", ")}
+                          {RECURRENCE_LABEL[e.recurrence]}
+                          {attachments > 0
+                            ? ` · 📎 ${attachments === 1 ? "1 allegato" : `${attachments} allegati`}`
+                            : " · senza allegato"}
+                          {messages > 0 && ` · ${messages} messaggi`}
                         </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className={`${tdClass} text-right tabular-nums`}>
+                        {formatEuro(e.amountCents)}
+                      </td>
+                      <td className={tdClass}>{e.createdBy.name}</td>
+                      <td className={tdClass}>
+                        {mustApprove && (
+                          <span className="block font-medium text-amber-700">
+                            Tocca a te approvare
+                          </span>
+                        )}
+                        {mustReply && (
+                          <span className="block font-medium text-sky-700">
+                            C&apos;è una domanda per te
+                          </span>
+                        )}
+                        {!mustApprove && (
+                          <span className="block text-xs text-slate-500">
+                            Manca: {missing.map((p) => p.name).join(", ")}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ),
+                )}
               </tbody>
             </table>
           </div>
@@ -174,6 +185,11 @@ export default async function ExpensesPage({
                       >
                         {e.description}
                       </Link>
+                      {e._count.attachments > 0 && (
+                        <span className="ml-1" title="Con allegato">
+                          📎
+                        </span>
+                      )}
                       {e.supplier && (
                         <span className="block text-xs text-slate-500">{e.supplier}</span>
                       )}

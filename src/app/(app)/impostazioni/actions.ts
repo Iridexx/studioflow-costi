@@ -16,7 +16,7 @@ import {
   sendMail,
 } from "@/modules/mail/service";
 import { normalizeAppUrl } from "@/modules/partners/invite";
-import { setAppUrl, setPilotStudios } from "@/modules/settings/service";
+import { setAppUrl, setAttachmentRequired, setPilotStudios } from "@/modules/settings/service";
 import { saveDigestSettings, sendDigest } from "@/modules/digest/service";
 import { formatTime, parseTime, romeClock } from "@/modules/digest/schedule";
 import { createTopic, topicNameTaken, updateTopic } from "@/modules/time/service";
@@ -181,4 +181,16 @@ export async function sendDigestNow(): Promise<FormState> {
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Invio non riuscito." };
   }
+}
+
+export async function saveAttachmentRequired(_: FormState, form: FormData): Promise<FormState> {
+  await requireAdmin();
+  return handle(async () => {
+    const required = checkbox(form, "required");
+    await setAttachmentRequired(required);
+    revalidatePath("/", "layout");
+    return required
+      ? "Salvato: una spesa nuova si registra solo con la ricevuta o un giustificativo allegato."
+      : "Salvato: l'allegato ora è facoltativo.";
+  });
 }

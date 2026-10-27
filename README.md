@@ -15,6 +15,12 @@ privato; in StudioFlow c'è solo una voce di menu che lo apre, visibile se sul s
 - **Spese**: una tantum, mensili o annuali (con data di fine quando si disdice), IVA, fornitore,
   categoria, chi l'ha pagata (cassa comune o un socio di tasca sua). Le ricorrenti si inseriscono
   una volta sola: il programma conta da solo ogni addebito mensile o annuale.
+- **Ricevute**: ogni spesa ha la sua ricevuta o giustificativo (PDF o foto JPG, PNG, WebP, fino a
+  10 MB ciascuno, al massimo 5). Di base senza allegato la spesa non si registra; da
+  **Impostazioni → Ricevute delle spese** l'amministratore può renderlo facoltativo. I soci
+  vedono le anteprime e aprono o scaricano i file dalla pagina della spesa prima di approvarla.
+  Le spese registrate prima restano valide anche senza allegato. I file stanno nel database,
+  quindi sono compresi nel backup notturno e seguono il programma se cambia PC.
 - **Approvazione delle spese**: una spesa entra nei conti solo quando l'hanno approvata tutti i
   soci con accesso (chi la inserisce la approva in automatico; con un socio solo è subito nei
   conti). Su ogni spesa i soci possono scriversi per chiedere spiegazioni prima di approvare. Chi
@@ -94,6 +100,7 @@ soci** (es. `http://nome-pc:3100`); se apri il programma da `localhost` te lo ri
 Nel file `.env` indica in `COSTI_BACKUP_DIR` una cartella sincronizzata (es.
 `C:\Users\marco\OneDrive\Backup StudioFlow Costi`), poi doppio clic su **`installa-backup.bat`**:
 programma il backup ogni sera alle 23 e ne fa subito uno di prova. Si tengono gli ultimi 30.
+Il backup comprende anche le ricevute allegate alle spese.
 
 Per ripristinare un backup (con il database di Docker):
 
