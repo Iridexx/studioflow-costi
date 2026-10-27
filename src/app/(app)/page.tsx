@@ -11,6 +11,7 @@ import {
 } from "@/components/ui";
 import { formatEuro, formatHours, monthName, todayDay } from "@/lib/format";
 import { RECURRENCE_LABEL } from "@/lib/labels";
+import { requirePartner } from "@/lib/session";
 import { listContributions } from "@/modules/contributions/service";
 import { listCategories, listExpenses, listUnapprovedExpenses } from "@/modules/expenses/service";
 import { listPartners } from "@/modules/partners/service";
@@ -34,6 +35,8 @@ export default async function SummaryPage({
 }: {
   searchParams: Promise<{ anno?: string }>;
 }) {
+  // Anche qui e non solo nel layout: dal menu il layout non viene rifatto.
+  await requirePartner();
   const params = await searchParams;
   const today = todayDay();
   const year = Number(params.anno) || today.getUTCFullYear();
