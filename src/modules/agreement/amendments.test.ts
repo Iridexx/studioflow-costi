@@ -53,4 +53,15 @@ describe("modifiche proposte all'accordo", () => {
     const text = applyAmendment(only46, plan)!;
     expect(text.indexOf("### 4.5")).toBeLessThan(text.indexOf("### 4.6"));
   });
+
+  it("la prima stesura del 4.6 viene sostituita, non duplicata", () => {
+    const oldText =
+      "## Articolo 4\n\n### 4.6 Spese a carico della Parte B\n\nVecchio testo.\n\n## Articolo 5 — Ore di lavoro\n\nAltro.";
+    const spese = AMENDMENTS.find((a) => a.id === "spese-parte-b")!;
+    const text = applyAmendment(oldText, spese)!;
+    expect(text).not.toContain("Vecchio testo.");
+    expect(text).toContain("### 4.6 Chi paga le spese per ora");
+    expect(text.match(/### 4\.6/g)).toHaveLength(1);
+    expect(text).toContain("## Articolo 5 — Ore di lavoro");
+  });
 });

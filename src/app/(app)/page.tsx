@@ -22,6 +22,7 @@ import {
   forecast,
   monthlyTotals,
   partnerBalances,
+  settlements,
 } from "@/modules/summary/calc";
 import { listTimeEntries } from "@/modules/time/service";
 
@@ -214,6 +215,11 @@ export default async function SummaryPage({
                 ))}
             </tbody>
           </table>
+          {settlements(balances.balances).map((t) => (
+            <p key={`${t.from.id}-${t.to.id}`} className="mt-2 text-sm text-sky-900">
+              {t.from.name} deve dare <strong>{formatEuro(t.cents)}</strong> a {t.to.name}
+            </p>
+          ))}
           <Link href="/soci" className="mt-3 inline-block text-sm text-slate-500 hover:underline">
             Dettaglio e versamenti →
           </Link>
