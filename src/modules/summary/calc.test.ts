@@ -4,8 +4,10 @@ import {
   chargeDates,
   fixedMonthlyCost,
   forecast,
+  hoursByPartner,
   monthlyTotals,
   partnerBalances,
+  pendingExpensesTotal,
   settlements,
   spentUntil,
   type ExpenseLike,
@@ -162,5 +164,56 @@ describe("riepilogo", () => {
     expect(s[0].from.id).toBe("b");
     expect(s[0].to.id).toBe("a");
     expect(s[0].cents).toBe(7686);
+  });
+});
+
+describe("costo delle ore", () => {
+  const partners = [
+    { id: "a", name: "Marco", shareBasisPoints: 7000 },
+    { id: "b", name: "Steve", shareBasisPoints: 3000 },
+    { id: "c", name: "Senza ore", shareBasisPoints: 0 },
+  ];
+  const entry = (partnerId: string, minutes: number, approved: boolean, date = "2026-10-20") => ({
+    partnerId,
+    date: d(date),
+    minutes,
+    hourlyRateCents: 6000,
+    approvedAt: approved ? d(date) : null,
+  });
+  const entries = [
+    entry("a", 90, true),
+    entry("a", 60, false),
+    entry("b", 30, true),
+    entry("b", 120, true, "2025-06-01"),
+  ];
+
+  it("separa ore confermate e da confermare, per socio e in totale", () => {
+    const { rows, total } = hoursByPartner(partners, entries);
+    expect(rows.map((r) => r.partner.id)).toEqual(["a", "b"]);
+    expect(rows[0]).toMatchObject({
+      confirmedMinutes: 90,
+      confirmedCents: 9000,
+      pendingMinutes: 60,
+      pendingCents: 6000,
+    });
+    expect(total).toEqual({
+      confirmedMinutes: 240,
+      confirmedCents: 24000,
+      pendingMinutes: 60,
+      pendingCents: 6000,
+    });
+  });
+
+  it("con l'anno conta solo le ore di quell'anno", () => {
+    expect(hoursByPartner(partners, entries, 2025).total.confirmedCents).toBe(12000);
+  });
+});
+
+describe("spese da approvare", () => {
+  it("somma gli importi", () => {
+    expect(pendingExpensesTotal([{ amountCents: 1000 }, { amountCents: 2500 }])).toEqual({
+      count: 2,
+      cents: 3500,
+    });
   });
 });

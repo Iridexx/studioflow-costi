@@ -24,6 +24,14 @@ export function listTimeEntries() {
   });
 }
 
+// Tutte le ore, confermate e da confermare: per il riepilogo.
+export function listAllTimeEntries() {
+  return prisma.timeEntry.findMany({
+    include,
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+  });
+}
+
 // Tutte le ore, con chi deve ancora confermarle e se tocca al socio indicato.
 export async function listTimeEntriesWithStatus(partnerId: string) {
   const [entries, approvers] = await Promise.all([

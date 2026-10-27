@@ -204,3 +204,63 @@ export function settlements(balances: PartnerBalance[]): Settlement[] {
   }
   return result;
 }
+
+export type TimeEntryLike = {
+  partnerId: string;
+  date: Date;
+  minutes: number;
+  hourlyRateCents: number;
+  approvedAt: Date | null;
+};
+
+// Valore delle ore al costo orario fissato quando sono state registrate.
+export function timeValueCents(entry: { minutes: number; hourlyRateCents: number }): number {
+  return Math.round((entry.minutes * entry.hourlyRateCents) / 60);
+}
+
+export type HoursTotals = {
+  confirmedMinutes: number;
+  confirmedCents: number;
+  pendingMinutes: number;
+  pendingCents: number;
+};
+
+export type PartnerHours = HoursTotals & { partner: PartnerLike };
+
+function hoursTotals(entries: TimeEntryLike[]): HoursTotals {
+  const confirmed = entries.filter((e) => e.approvedAt);
+  const pending = entries.filter((e) => !e.approvedAt);
+  return {
+    confirmedMinutes: sum(confirmed.map((e) => e.minutes)),
+    confirmedCents: sum(confirmed.map(timeValueCents)),
+    pendingMinutes: sum(pending.map((e) => e.minutes)),
+    pendingCents: sum(pending.map(timeValueCents)),
+  };
+}
+
+// Ore e loro costo per socio, separando le confermate da tutti da quelle ancora da confermare.
+// Solo i soci con ore; con `year` solo le ore di quell'anno.
+export function hoursByPartner<P extends PartnerLike>(
+  partners: P[],
+  entries: TimeEntryLike[],
+  year?: number,
+): { rows: (HoursTotals & { partner: P })[]; total: HoursTotals } {
+  const counted =
+    year === undefined ? entries : entries.filter((e) => e.date.getUTCFullYear() === year);
+  const rows = partners
+    .map((partner) => ({
+      partner,
+      ...hoursTotals(counted.filter((e) => e.partnerId === partner.id)),
+    }))
+    .filter((r) => r.confirmedMinutes > 0 || r.pendingMinutes > 0);
+  return { rows, total: hoursTotals(counted) };
+}
+
+// Spese ancora da approvare: quante e per quanto (ogni voce per il suo importo, gli abbonamenti
+// per una rata).
+export function pendingExpensesTotal(expenses: { amountCents: number }[]): {
+  count: number;
+  cents: number;
+} {
+  return { count: expenses.length, cents: sum(expenses.map((e) => e.amountCents)) };
+}

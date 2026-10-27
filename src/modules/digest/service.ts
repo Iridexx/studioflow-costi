@@ -2,7 +2,12 @@ import { prisma } from "@/lib/db";
 import { buildDigest } from "@/modules/digest/build";
 import { DEFAULT_DIGEST_TIME, dueDay, parseTime, romeClock } from "@/modules/digest/schedule";
 import { isMailConfigured, sendMail } from "@/modules/mail/service";
+import { listContributions } from "@/modules/contributions/service";
+import { listExpenses, listUnapprovedExpenses } from "@/modules/expenses/service";
+import { listPartners } from "@/modules/partners/service";
 import { getAppUrl } from "@/modules/settings/service";
+import { hoursByPartner, partnerBalances, pendingExpensesTotal } from "@/modules/summary/calc";
+import { listAllTimeEntries } from "@/modules/time/service";
 
 // Riepilogo email ai soci con le spese e le ore inserite nella giornata. Parte da solo all'orario
 // scelto in Impostazioni (di base 23:55), solo nei giorni in cui c'è qualcosa di nuovo.
@@ -48,9 +53,25 @@ async function recipients() {
   return partners.map((p) => p.email!).filter(Boolean);
 }
 
+// Totali dei conti a oggi, come nella pagina Riepilogo.
+async function currentStatus(today: Date) {
+  const [expenses, unapproved, partners, contributions, entries] = await Promise.all([
+    listExpenses(),
+    listUnapprovedExpenses(),
+    listPartners(),
+    listContributions(),
+    listAllTimeEntries(),
+  ]);
+  return {
+    spentCents: partnerBalances(partners, expenses, contributions, today).spentCents,
+    pendingExpenses: pendingExpensesTotal(unapproved),
+    hours: hoursByPartner(partners, entries).total,
+  };
+}
+
 // Spedisce il riepilogo di quanto è stato inserito dopo `since`. Restituisce un messaggio.
 export async function sendDigest(day: string, since: Date, until: Date): Promise<string> {
-  const [expenses, entries] = await Promise.all([
+  const [expenses, entries, status] = await Promise.all([
     prisma.expense.findMany({
       where: { createdAt: { gt: since, lte: until } },
       include: { createdBy: { select: { name: true } } },
@@ -61,10 +82,12 @@ export async function sendDigest(day: string, since: Date, until: Date): Promise
       include: { partner: { select: { name: true } } },
       orderBy: { createdAt: "asc" },
     }),
+    currentStatus(new Date(`${day}T00:00:00Z`)),
   ]);
   const digest = buildDigest({
     day,
     appUrl: (await getAppUrl()) ?? "http://localhost:3100",
+    status,
     expenses: expenses.map((e) => ({
       date: e.date,
       description: e.description,
