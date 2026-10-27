@@ -7,6 +7,7 @@ import { PrintButton } from "@/components/print-button";
 import { Card, Field, PageTitle, inputClass } from "@/components/ui";
 import { dayInput, formatDay } from "@/lib/format";
 import { requirePartner } from "@/lib/session";
+import { applyAmendment, pendingAmendments } from "@/modules/agreement/amendments";
 import { missingFields, parseAgreement } from "@/modules/agreement/render";
 import { describeSummary, diffAgreement, summarize } from "@/modules/agreement/diff";
 import { getAgreementParties, getLatestVersion, listVersions } from "@/modules/agreement/service";
@@ -68,6 +69,7 @@ export default async function AgreementPage() {
   const complete = missing.every((m) => m.labels.length === 0);
   const roleA = partners.find((p) => p.agreementRole === "A");
   const roleB = partners.find((p) => p.agreementRole === "B");
+  const amendments = pendingAmendments(version.text);
 
   return (
     <>
@@ -78,6 +80,32 @@ export default async function AgreementPage() {
         />
         <div className="mb-6 space-y-6">
           <AgreementStatus {...latest} meId={me.id} />
+          {amendments.length > 0 && (
+            <Card title="Modifiche da inserire" className="border-sky-300">
+              <ul className="space-y-4 text-sm text-slate-700">
+                {amendments.map((a) => (
+                  <li key={a.id}>
+                    <p className="font-medium">{a.title}</p>
+                    <p className="mb-2 text-slate-500">
+                      {version.finalizedAt
+                        ? "L'accordo è definitivo: per inserirla chiedi prima di riaprirlo (qui sopra). Quando è riaperto, da qui prepari la nuova versione."
+                        : applyAmendment(version.text, a)
+                          ? "Il programma prepara la nuova versione con la modifica già al suo posto: la controlli, la salvi e gli altri soci la convalidano."
+                          : "Non trovo nel testo il punto dove inserirla: apri la modifica del testo e incolla il paragrafo dove serve."}
+                    </p>
+                    {!version.finalizedAt && (
+                      <Link
+                        href={`/accordo/modifica?proposta=${a.id}`}
+                        className="inline-block rounded-md bg-sky-700 px-3 py-1.5 font-medium text-white hover:bg-sky-600"
+                      >
+                        Prepara la nuova versione
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
           {previous && (
             <Card title={`Cosa è cambiato rispetto alla versione ${previous.number}`}>
               <p className="mb-4 text-sm text-slate-500">

@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { RECURRENCE_LABEL } from "@/lib/labels";
 import { listContributions } from "@/modules/contributions/service";
 import { listExpenses } from "@/modules/expenses/service";
+import { splitLabel } from "@/modules/expenses/split";
 import { listPartners } from "@/modules/partners/service";
 import { charges, fixedMonthlyCost, forecast, partnerBalances } from "@/modules/summary/calc";
 import { listTimeEntries } from "@/modules/time/service";
@@ -81,6 +82,7 @@ export async function buildWorkbook(today: Date): Promise<ExcelJS.Workbook> {
     { header: "Importo (IVA incl.)", key: "amount", width: 16, style: { numFmt: EURO } },
     { header: "IVA %", key: "vat", width: 8 },
     { header: "Pagata da", key: "paidBy", width: 18 },
+    { header: "Costo diviso", key: "split", width: 26 },
     { header: "Note", key: "notes", width: 30 },
     { header: "Inserita da", key: "createdBy", width: 18 },
   ]);
@@ -95,6 +97,7 @@ export async function buildWorkbook(today: Date): Promise<ExcelJS.Workbook> {
       amount: eur(e.amountCents),
       vat: e.vatBasisPoints / 100,
       paidBy: e.paidBy?.name ?? "Cassa comune",
+      split: splitLabel(e.partyBShareBasisPoints),
       notes: e.notes ?? "",
       createdBy: e.createdBy.name,
     });

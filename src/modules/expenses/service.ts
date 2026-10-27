@@ -12,6 +12,7 @@ export type ExpenseInput = {
   vatBasisPoints: number;
   recurrence: Recurrence;
   paidById: string | null;
+  partyBShareBasisPoints: number | null;
   notes: string | null;
 };
 

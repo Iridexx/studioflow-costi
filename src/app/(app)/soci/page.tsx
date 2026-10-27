@@ -45,6 +45,13 @@ export default async function PartnersPage() {
             socio con Modifica e salva, il programma ricalcola le quote degli altri.
           </p>
         )}
+        {summary.partiesMissing && (
+          <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Alcune spese vanno divise tra Parte A e Parte B (come il piano per lo sviluppo), ma le
+            parti non sono ancora scelte: l&apos;amministratore le sceglie nella pagina Accordo.
+            Intanto sono divise secondo le quote.
+          </p>
+        )}
         <div className="overflow-x-auto">
           <table className={tableClass}>
             <thead>
@@ -88,7 +95,8 @@ export default async function PartnersPage() {
         </p>
         <p className="mt-1 text-xs text-slate-500">
           Saldo positivo: ha messo più della sua quota. Negativo: deve ancora mettere la differenza.
-          Le ore di lavoro non entrano nel saldo: sono nella pagina Ore.
+          Il piano per lo sviluppo si divide come dice l&apos;accordo (art. 4.5): 70% Parte B, 30%
+          Parte A. Le ore di lavoro non entrano nel saldo: sono nella pagina Ore.
         </p>
       </Card>
 

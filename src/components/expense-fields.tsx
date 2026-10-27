@@ -2,6 +2,7 @@ import { AttachmentInput } from "@/components/attachment-input";
 import { Field, inputClass } from "@/components/ui";
 import { dayInput, euroInput } from "@/lib/format";
 import { ATTACHMENT_HINT, formatFileSize } from "@/modules/expenses/attachments";
+import { DEVELOPMENT_PLAN_PARTY_B_SHARE, splitLabel } from "@/modules/expenses/split";
 
 type Option = { id: string; name: string };
 
@@ -15,6 +16,7 @@ export type ExpenseDefaults = {
   vatBasisPoints: number;
   recurrence: string;
   paidById: string | null;
+  partyBShareBasisPoints: number | null;
   notes: string | null;
 };
 
@@ -104,6 +106,28 @@ export function ExpenseFields({
           ))}
         </select>
       </Field>
+      <div className="sm:col-span-2">
+        <Field
+          label="Chi ne sostiene il costo"
+          hint="Il piano per lo sviluppo segue l'art. 4.5 dell'accordo"
+        >
+          <select
+            name="split"
+            defaultValue={defaults?.partyBShareBasisPoints?.toString() ?? ""}
+            className={inputClass}
+          >
+            <option value="">Secondo le quote dei soci</option>
+            {[DEVELOPMENT_PLAN_PARTY_B_SHARE, defaults?.partyBShareBasisPoints]
+              .filter((v, i, all): v is number => v != null && all.indexOf(v) === i)
+              .map((v) => (
+                <option key={v} value={v}>
+                  {v === DEVELOPMENT_PLAN_PARTY_B_SHARE ? "Piano per lo sviluppo: " : ""}
+                  {splitLabel(v)}
+                </option>
+              ))}
+          </select>
+        </Field>
+      </div>
       <Field label="Data (o primo addebito)">
         <input
           name="date"

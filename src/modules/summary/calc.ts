@@ -10,6 +10,8 @@ export type ExpenseLike = {
   recurrence: Recurrence;
   categoryId: string;
   paidById: string | null;
+  // Parte del costo della Parte B dell'accordo (il resto è della Parte A); vuoto = secondo le quote.
+  partyBShareBasisPoints?: number | null;
 };
 
 export type Charge<E extends ExpenseLike = ExpenseLike> = { expense: E; date: Date };
@@ -96,12 +98,17 @@ export function forecast(expenses: ExpenseLike[], today: Date, months = 12): num
   return sum(charges(expenses, from, addMonths(today, months)).map((c) => c.expense.amountCents));
 }
 
-export type PartnerLike = { id: string; name: string; shareBasisPoints: number };
+export type PartnerLike = {
+  id: string;
+  name: string;
+  shareBasisPoints: number;
+  agreementRole?: "A" | "B" | null;
+};
 export type ContributionLike = { partnerId: string; amountCents: number; date: Date };
 
 export type PartnerBalance = {
   partner: PartnerLike;
-  // Quota delle spese che gli spetta.
+  // Quota delle spese che gli spetta (secondo le quote o, per alcune spese, secondo l'accordo).
   dueCents: number;
   // Spese pagate di tasca propria.
   paidCents: number;
@@ -116,12 +123,35 @@ export function partnerBalances(
   expenses: ExpenseLike[],
   contributions: ContributionLike[],
   today: Date,
-): { balances: PartnerBalance[]; spentCents: number; cashCents: number; sharesTotal: number } {
+): {
+  balances: PartnerBalance[];
+  spentCents: number;
+  cashCents: number;
+  sharesTotal: number;
+  // Ci sono spese da dividere tra Parte A e Parte B ma le parti dell'accordo non sono scelte:
+  // intanto si dividono secondo le quote.
+  partiesMissing: boolean;
+} {
   const past = charges(expenses, EPOCH, today);
   const spentCents = sum(past.map((c) => c.expense.amountCents));
   const counted = contributions.filter((c) => c.date <= today);
+  const hasParties =
+    partners.some((p) => p.agreementRole === "A") && partners.some((p) => p.agreementRole === "B");
+  const byParties = past.filter((c) => hasParties && c.expense.partyBShareBasisPoints != null);
+  const byShares = past.filter((c) => !byParties.includes(c));
+  const sharedCents = sum(byShares.map((c) => c.expense.amountCents));
+  const partyCents = (role: "A" | "B") =>
+    sum(
+      byParties.map((c) => {
+        const b = c.expense.partyBShareBasisPoints!;
+        return (c.expense.amountCents * (role === "B" ? b : 10000 - b)) / 10000;
+      }),
+    );
   const balances = partners.map((partner) => {
-    const dueCents = Math.round((spentCents * partner.shareBasisPoints) / 10000);
+    const dueCents = Math.round(
+      (sharedCents * partner.shareBasisPoints) / 10000 +
+        (partner.agreementRole ? partyCents(partner.agreementRole) : 0),
+    );
     const paidCents = sum(
       past.filter((c) => c.expense.paidById === partner.id).map((c) => c.expense.amountCents),
     );
@@ -145,5 +175,6 @@ export function partnerBalances(
     spentCents,
     cashCents,
     sharesTotal: sum(partners.map((p) => p.shareBasisPoints)),
+    partiesMissing: !hasParties && past.some((c) => c.expense.partyBShareBasisPoints != null),
   };
 }
