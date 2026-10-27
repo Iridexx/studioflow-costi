@@ -124,4 +124,22 @@ describe("riepilogo", () => {
     expect(r.balances.map((b) => b.dueCents)).toEqual([7000, 3000]);
     expect(r.partiesMissing).toBe(true);
   });
+
+  it("una spesa a carico della Parte B pagata dalla Parte A: B la rimborsa", () => {
+    const partners = [
+      { id: "a", name: "A", shareBasisPoints: 7000, agreementRole: "A" as const },
+      { id: "b", name: "B", shareBasisPoints: 3000, agreementRole: "B" as const },
+    ];
+    const items = [
+      expense({
+        amountCents: 2440,
+        date: d("2026-05-02"),
+        paidById: "a",
+        partyBShareBasisPoints: 10000,
+      }),
+    ];
+    const r = partnerBalances(partners, items, [], today);
+    expect(r.balances[0].balanceCents).toBe(2440);
+    expect(r.balances[1].balanceCents).toBe(-2440);
+  });
 });

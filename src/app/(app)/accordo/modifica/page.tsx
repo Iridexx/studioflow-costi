@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
 import { Card, Field, PageTitle, inputClass } from "@/components/ui";
 import { requirePartner } from "@/lib/session";
-import { applyAmendment, findAmendment, pendingAmendments } from "@/modules/agreement/amendments";
+import { applyPendingAmendments } from "@/modules/agreement/amendments";
 import { getLatestVersion } from "@/modules/agreement/service";
 import { saveNewVersion } from "../actions";
 
@@ -16,11 +16,9 @@ export default async function EditAgreementPage({
   const { version } = await getLatestVersion();
   if (version.finalizedAt) redirect("/accordo");
   // Da "Modifiche da inserire": il testo arriva con la modifica già al suo posto.
-  const amendment = findAmendment((await searchParams).proposta);
-  const proposed =
-    amendment && pendingAmendments(version.text).includes(amendment)
-      ? applyAmendment(version.text, amendment)
-      : null;
+  const pending =
+    (await searchParams).proposta === "tutte" ? applyPendingAmendments(version.text) : null;
+  const proposed = pending && pending.applied.length > 0 ? pending : null;
   return (
     <>
       <Link href="/accordo" className="text-sm text-slate-500 hover:underline">
@@ -30,10 +28,14 @@ export default async function EditAgreementPage({
         title="Modifica l'accordo"
         subtitle={`Parti dalla versione ${version.number}. Salvando nasce la versione ${version.number + 1}: la precedente resta com'era e l'altro socio vede subito cosa hai cambiato.`}
       />
-      {proposed && amendment && (
+      {proposed && (
         <p className="mb-4 rounded-md bg-sky-50 px-3 py-2 text-sm text-sky-900">
-          Nel testo qui sotto è già inserita la modifica “{amendment.title}”. Controllala e salva:
-          gli altri soci vedranno la differenza e dovranno convalidare la nuova versione.
+          Nel testo qui sotto{" "}
+          {proposed.applied.length === 1
+            ? "è già inserita la modifica"
+            : "sono già inserite le modifiche"}{" "}
+          {proposed.applied.map((a) => `“${a.title}”`).join(" e ")}. Controlla e salva: gli altri
+          soci vedranno la differenza e dovranno convalidare la nuova versione.
         </p>
       )}
       <Card>
@@ -51,7 +53,7 @@ export default async function EditAgreementPage({
               name="note"
               required
               maxLength={300}
-              defaultValue={proposed ? amendment?.note : undefined}
+              defaultValue={proposed?.applied.map((a) => a.note).join("; ")}
               className={inputClass}
             />
           </Field>
@@ -62,7 +64,7 @@ export default async function EditAgreementPage({
             <textarea
               name="text"
               required
-              defaultValue={proposed ?? version.text}
+              defaultValue={proposed?.text ?? version.text}
               rows={30}
               className={`${inputClass} font-mono text-xs leading-relaxed`}
             />

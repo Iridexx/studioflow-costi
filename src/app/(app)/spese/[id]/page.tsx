@@ -63,7 +63,7 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
           pagata da {expense.paidBy?.name ?? "cassa comune"}
           {expense.supplier && ` · ${expense.supplier}`}
           {expense.partyBShareBasisPoints !== null &&
-            ` · costo diviso ${splitLabel(expense.partyBShareBasisPoints)}`}
+            ` · costo: ${splitLabel(expense.partyBShareBasisPoints)}`}
         </p>
         {expense.notes && <p className="mb-3 text-sm text-slate-600">{expense.notes}</p>}
         {expense.approvedAt ? (

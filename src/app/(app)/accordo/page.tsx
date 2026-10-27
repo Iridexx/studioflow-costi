@@ -82,28 +82,28 @@ export default async function AgreementPage() {
           <AgreementStatus {...latest} meId={me.id} />
           {amendments.length > 0 && (
             <Card title="Modifiche da inserire" className="border-sky-300">
-              <ul className="space-y-4 text-sm text-slate-700">
+              <ul className="mb-3 list-disc space-y-1 pl-5 text-sm text-slate-700">
                 {amendments.map((a) => (
                   <li key={a.id}>
-                    <p className="font-medium">{a.title}</p>
-                    <p className="mb-2 text-slate-500">
-                      {version.finalizedAt
-                        ? "L'accordo è definitivo: per inserirla chiedi prima di riaprirlo (qui sopra). Quando è riaperto, da qui prepari la nuova versione."
-                        : applyAmendment(version.text, a)
-                          ? "Il programma prepara la nuova versione con la modifica già al suo posto: la controlli, la salvi e gli altri soci la convalidano."
-                          : "Non trovo nel testo il punto dove inserirla: apri la modifica del testo e incolla il paragrafo dove serve."}
-                    </p>
-                    {!version.finalizedAt && (
-                      <Link
-                        href={`/accordo/modifica?proposta=${a.id}`}
-                        className="inline-block rounded-md bg-sky-700 px-3 py-1.5 font-medium text-white hover:bg-sky-600"
-                      >
-                        Prepara la nuova versione
-                      </Link>
-                    )}
+                    {a.title}
+                    {!applyAmendment(version.text, a) &&
+                      " (non trovo il punto dove inserirla: va incollata a mano)"}
                   </li>
                 ))}
               </ul>
+              <p className="mb-3 text-sm text-slate-500">
+                {version.finalizedAt
+                  ? "L'accordo è definitivo: per inserirle chiedi prima di riaprirlo (qui sopra). Quando è riaperto, da qui prepari la nuova versione."
+                  : "Il programma prepara una nuova versione con le modifiche già al loro posto: la controlli, la salvi e gli altri soci la convalidano."}
+              </p>
+              {!version.finalizedAt && (
+                <Link
+                  href="/accordo/modifica?proposta=tutte"
+                  className="inline-block rounded-md bg-sky-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-600"
+                >
+                  Prepara la nuova versione
+                </Link>
+              )}
             </Card>
           )}
           {previous && (

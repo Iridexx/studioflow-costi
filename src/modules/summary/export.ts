@@ -82,7 +82,7 @@ export async function buildWorkbook(today: Date): Promise<ExcelJS.Workbook> {
     { header: "Importo (IVA incl.)", key: "amount", width: 16, style: { numFmt: EURO } },
     { header: "IVA %", key: "vat", width: 8 },
     { header: "Pagata da", key: "paidBy", width: 18 },
-    { header: "Costo diviso", key: "split", width: 26 },
+    { header: "A carico di", key: "split", width: 28 },
     { header: "Note", key: "notes", width: 30 },
     { header: "Inserita da", key: "createdBy", width: 18 },
   ]);

@@ -34,6 +34,7 @@ import {
   type ExpenseInput,
   type NewAttachment,
 } from "@/modules/expenses/service";
+import { AUTOMATIC_SPLIT, automaticPartyBShare } from "@/modules/expenses/split";
 
 const RECURRENCES = ["ONE_OFF", "MONTHLY", "YEARLY"] as const;
 
@@ -52,7 +53,15 @@ async function readExpense(form: FormData): Promise<ExpenseInput> {
   if (paidById && !(await prisma.partner.findUnique({ where: { id: paidById } })))
     throw new FormError("Socio non trovato.");
   const split = text(form, "split");
-  const partyBShareBasisPoints = split === "" ? null : Number(split);
+  const description = requiredText(form, "description", "Descrizione");
+  const supplier = optionalText(form, "supplier");
+  // In automatico vale l'accordo: il piano Claude 70% Parte B, ogni altra spesa tutta della Parte B.
+  const partyBShareBasisPoints =
+    split === AUTOMATIC_SPLIT
+      ? automaticPartyBShare({ description, supplier })
+      : split === ""
+        ? null
+        : Number(split);
   if (
     partyBShareBasisPoints !== null &&
     !(
@@ -66,8 +75,8 @@ async function readExpense(form: FormData): Promise<ExpenseInput> {
   return {
     date,
     endDate,
-    description: requiredText(form, "description", "Descrizione"),
-    supplier: optionalText(form, "supplier"),
+    description,
+    supplier,
     categoryId,
     amountCents: euro(form, "amount", "Importo"),
     vatBasisPoints: Number.isFinite(vat) && vat >= 0 && vat <= 100 ? Math.round(vat * 100) : 0,
