@@ -90,4 +90,38 @@ describe("riepilogo", () => {
     expect(r.cashCents).toBe(30000 - 18000);
     expect(r.sharesTotal).toBe(10000);
   });
+
+  it("il piano per lo sviluppo si divide 70% Parte B e 30% Parte A", () => {
+    const partners = [
+      { id: "a", name: "A", shareBasisPoints: 7000, agreementRole: "A" as const },
+      { id: "b", name: "B", shareBasisPoints: 3000, agreementRole: "B" as const },
+    ];
+    const items = [
+      expense({ amountCents: 10000, date: d("2026-05-01") }),
+      expense({
+        amountCents: 10980,
+        date: d("2026-05-02"),
+        paidById: "b",
+        partyBShareBasisPoints: 7000,
+      }),
+    ];
+    const r = partnerBalances(partners, items, [], today);
+    expect(r.balances[0].dueCents).toBe(7000 + 3294);
+    expect(r.balances[1].dueCents).toBe(3000 + 7686);
+    expect(r.balances[1].balanceCents).toBe(10980 - 10686);
+    expect(r.partiesMissing).toBe(false);
+  });
+
+  it("senza Parte A e Parte B scelte si divide secondo le quote", () => {
+    const partners = [
+      { id: "a", name: "A", shareBasisPoints: 7000 },
+      { id: "b", name: "B", shareBasisPoints: 3000 },
+    ];
+    const items = [
+      expense({ amountCents: 10000, date: d("2026-05-02"), partyBShareBasisPoints: 7000 }),
+    ];
+    const r = partnerBalances(partners, items, [], today);
+    expect(r.balances.map((b) => b.dueCents)).toEqual([7000, 3000]);
+    expect(r.partiesMissing).toBe(true);
+  });
 });

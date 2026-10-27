@@ -41,6 +41,17 @@ async function readExpense(form: FormData): Promise<ExpenseInput> {
   const paidById = text(form, "paidById") || null;
   if (paidById && !(await prisma.partner.findUnique({ where: { id: paidById } })))
     throw new FormError("Socio non trovato.");
+  const split = text(form, "split");
+  const partyBShareBasisPoints = split === "" ? null : Number(split);
+  if (
+    partyBShareBasisPoints !== null &&
+    !(
+      Number.isInteger(partyBShareBasisPoints) &&
+      partyBShareBasisPoints >= 0 &&
+      partyBShareBasisPoints <= 10000
+    )
+  )
+    throw new FormError("Scegli come si divide il costo.");
   const vat = Number(text(form, "vat"));
   return {
     date,
@@ -52,6 +63,7 @@ async function readExpense(form: FormData): Promise<ExpenseInput> {
     vatBasisPoints: Number.isFinite(vat) && vat >= 0 && vat <= 100 ? Math.round(vat * 100) : 0,
     recurrence,
     paidById,
+    partyBShareBasisPoints,
     notes: optionalText(form, "notes"),
   };
 }
