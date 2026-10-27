@@ -6,6 +6,7 @@ import { formatDay } from "@/lib/format";
 import { isFullyApproved, missingApprovers } from "@/modules/expenses/approval";
 import { listApprovers } from "@/modules/expenses/service";
 import type { Parties, PartyData } from "./render";
+import { agreementTerms } from "./terms";
 
 // La prima versione dell'accordo nasce da docs/accordo-soci.md alla prima apertura della pagina;
 // da lì in poi il testo vive nel database e lo modificano i soci.
@@ -96,6 +97,22 @@ export async function getLatestVersion() {
       ? missingApprovers(approvers, idsOf(version.approvals, "REOPEN"))
       : [];
   return { version, missing, missingReopen, approversCount: approvers.length };
+}
+
+// I numeri dell'accordo che servono ai conti (quote dell'art. 3, valore orario dell'art. 5.2),
+// dall'ultima versione definitiva o, se non ce n'è ancora una, dall'ultima bozza.
+export async function getAgreementTerms() {
+  await ensureFirstVersion();
+  const version =
+    (await prisma.agreementVersion.findFirst({
+      where: { finalizedAt: { not: null }, reopenedAt: null },
+      orderBy: { number: "desc" },
+    })) ?? (await prisma.agreementVersion.findFirstOrThrow({ orderBy: { number: "desc" } }));
+  return {
+    ...agreementTerms(version.text),
+    versionNumber: version.number,
+    final: version.finalizedAt !== null,
+  };
 }
 
 export async function listVersions() {

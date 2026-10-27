@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { redistribute, sharesProblem } from "./shares";
+import { redistribute, sharesFromAgreement, sharesProblem } from "./shares";
 
 describe("quote dei soci", () => {
   it("con un solo altro socio gli toglie tutta la quota del nuovo", () => {
@@ -59,5 +59,35 @@ describe("quote dei soci", () => {
   it("segnala un totale diverso da 100%", () => {
     expect(sharesProblem([5000, 5000])).toBeNull();
     expect(sharesProblem([10000, 5000])).toContain("150%");
+  });
+});
+
+describe("quote dell'accordo", () => {
+  const agreement = { A: 7000, B: 3000 };
+
+  it("porta le quote per le spese a quelle dell'accordo, solo per chi cambia", () => {
+    const partners = [
+      { id: "m", shareBasisPoints: 5000, agreementRole: "A" as const },
+      { id: "s", shareBasisPoints: 5000, agreementRole: "B" as const },
+      { id: "c", shareBasisPoints: 0, agreementRole: null },
+    ];
+    expect(sharesFromAgreement(partners, agreement)).toEqual([
+      { id: "m", share: 7000 },
+      { id: "s", share: 3000 },
+    ]);
+  });
+
+  it("niente da cambiare se sono già uguali", () => {
+    const partners = [
+      { id: "m", shareBasisPoints: 7000, agreementRole: "A" as const },
+      { id: "s", shareBasisPoints: 3000, agreementRole: "B" as const },
+    ];
+    expect(sharesFromAgreement(partners, agreement)).toEqual([]);
+  });
+
+  it("senza Parte A e Parte B scelte non propone niente", () => {
+    expect(
+      sharesFromAgreement([{ id: "m", shareBasisPoints: 10000, agreementRole: null }], agreement),
+    ).toBeNull();
   });
 });

@@ -118,6 +118,24 @@ export type PartnerBalance = {
   balanceCents: number;
 };
 
+// Ci sono sia la Parte A sia la Parte B dell'accordo: le spese con ripartizione si dividono tra le
+// parti, altrimenti secondo le quote dei soci.
+function partiesChosen(partners: PartnerLike[]): boolean {
+  return (
+    partners.some((p) => p.agreementRole === "A") && partners.some((p) => p.agreementRole === "B")
+  );
+}
+
+// Quanto del costo di una spesa tocca a un socio, da 0 a 1.
+function costFraction(partner: PartnerLike, expense: ExpenseLike, hasParties: boolean): number {
+  const b = expense.partyBShareBasisPoints;
+  if (hasParties && b != null) {
+    if (!partner.agreementRole) return 0;
+    return (partner.agreementRole === "B" ? b : 10000 - b) / 10000;
+  }
+  return partner.shareBasisPoints / 10000;
+}
+
 export function partnerBalances(
   partners: PartnerLike[],
   expenses: ExpenseLike[],
@@ -131,26 +149,16 @@ export function partnerBalances(
   // Ci sono spese da dividere tra Parte A e Parte B ma le parti dell'accordo non sono scelte:
   // intanto si dividono secondo le quote.
   partiesMissing: boolean;
+  // Spese (voci, non addebiti) divise secondo le quote dei soci invece che tra le parti.
+  byShareCount: number;
 } {
   const past = charges(expenses, EPOCH, today);
   const spentCents = sum(past.map((c) => c.expense.amountCents));
   const counted = contributions.filter((c) => c.date <= today);
-  const hasParties =
-    partners.some((p) => p.agreementRole === "A") && partners.some((p) => p.agreementRole === "B");
-  const byParties = past.filter((c) => hasParties && c.expense.partyBShareBasisPoints != null);
-  const byShares = past.filter((c) => !byParties.includes(c));
-  const sharedCents = sum(byShares.map((c) => c.expense.amountCents));
-  const partyCents = (role: "A" | "B") =>
-    sum(
-      byParties.map((c) => {
-        const b = c.expense.partyBShareBasisPoints!;
-        return (c.expense.amountCents * (role === "B" ? b : 10000 - b)) / 10000;
-      }),
-    );
+  const hasParties = partiesChosen(partners);
   const balances = partners.map((partner) => {
     const dueCents = Math.round(
-      (sharedCents * partner.shareBasisPoints) / 10000 +
-        (partner.agreementRole ? partyCents(partner.agreementRole) : 0),
+      sum(past.map((c) => c.expense.amountCents * costFraction(partner, c.expense, hasParties))),
     );
     const paidCents = sum(
       past.filter((c) => c.expense.paidById === partner.id).map((c) => c.expense.amountCents),
@@ -176,6 +184,11 @@ export function partnerBalances(
     cashCents,
     sharesTotal: sum(partners.map((p) => p.shareBasisPoints)),
     partiesMissing: !hasParties && past.some((c) => c.expense.partyBShareBasisPoints != null),
+    byShareCount: new Set(
+      past
+        .filter((c) => !hasParties || c.expense.partyBShareBasisPoints == null)
+        .map((c) => c.expense.id),
+    ).size,
   };
 }
 
@@ -263,4 +276,73 @@ export function pendingExpensesTotal(expenses: { amountCents: number }[]): {
   cents: number;
 } {
   return { count: expenses.length, cents: sum(expenses.map((e) => e.amountCents)) };
+}
+
+export type PartnerAccount<P extends PartnerLike = PartnerLike> = PartnerBalance & {
+  partner: P;
+  hours: HoursTotals;
+  // Da ricevere con i ricavi del progetto (accordo, art. 7): prima le spese sostenute per la sua
+  // parte (art. 4.4), contate come se i conguagli tra soci fossero già fatti; poi le ore
+  // confermate al loro valore (art. 5.3).
+  refundExpensesCents: number;
+  refundHoursCents: number;
+};
+
+// Conti completi di ogni socio: saldo delle spese, ore e quanto gli spetta con i ricavi.
+export function partnerAccounts<P extends PartnerLike>(
+  balances: PartnerBalance[],
+  partners: P[],
+  entries: TimeEntryLike[],
+): PartnerAccount<P>[] {
+  return balances.map((b) => {
+    const partner = partners.find((p) => p.id === b.partner.id)!;
+    const hours = hoursTotals(entries.filter((e) => e.partnerId === partner.id));
+    return {
+      ...b,
+      partner,
+      hours,
+      refundExpensesCents: b.dueCents,
+      refundHoursCents: hours.confirmedCents,
+    };
+  });
+}
+
+export type PaidForOthers<E extends ExpenseLike = ExpenseLike> = {
+  expense: E;
+  payer: PartnerLike;
+  // Addebiti fino a oggi (gli abbonamenti uno per mese o per anno).
+  chargesCount: number;
+  paidCents: number;
+  // La parte che toccava a chi ha pagato; il resto l'ha anticipato per gli altri.
+  ownCents: number;
+};
+
+// Spese pagate di tasca da un socio anche per la parte di altri: spiegano i conguagli tra soci.
+export function paidForOthers<E extends ExpenseLike>(
+  partners: PartnerLike[],
+  expenses: E[],
+  today: Date,
+): PaidForOthers<E>[] {
+  const hasParties = partiesChosen(partners);
+  const rows = new Map<string, PaidForOthers<E>>();
+  for (const c of charges(expenses, EPOCH, today)) {
+    const payer = partners.find((p) => p.id === c.expense.paidById);
+    if (!payer) continue;
+    const own = c.expense.amountCents * costFraction(payer, c.expense, hasParties);
+    if (c.expense.amountCents - own < 0.5) continue;
+    const row = rows.get(c.expense.id) ?? {
+      expense: c.expense,
+      payer,
+      chargesCount: 0,
+      paidCents: 0,
+      ownCents: 0,
+    };
+    row.chargesCount += 1;
+    row.paidCents += c.expense.amountCents;
+    row.ownCents += own;
+    rows.set(c.expense.id, row);
+  }
+  return [...rows.values()]
+    .map((r) => ({ ...r, ownCents: Math.round(r.ownCents) }))
+    .sort((a, b) => b.paidCents - b.ownCents - (a.paidCents - a.ownCents));
 }

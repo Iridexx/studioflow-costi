@@ -40,3 +40,20 @@ export function sharesProblem(shares: number[]): string | null {
   const pct = (total / 100).toLocaleString("it-IT", { maximumFractionDigits: 2 });
   return `Le quote sommano a ${pct}% invece di 100%: correggile prima di salvare.`;
 }
+
+// Quote delle spese uguali alle quote di partecipazione dell'accordo (art. 3): la Parte A e la
+// Parte B prendono la loro, gli altri soci 0%. Solo i soci la cui quota cambia; null se le parti
+// dell'accordo non sono ancora scelte.
+export function sharesFromAgreement(
+  partners: { id: string; shareBasisPoints: number; agreementRole: "A" | "B" | null }[],
+  agreement: { A: number; B: number },
+): Share[] | null {
+  if (
+    !partners.some((p) => p.agreementRole === "A") ||
+    !partners.some((p) => p.agreementRole === "B")
+  )
+    return null;
+  return partners
+    .map((p) => ({ id: p.id, share: p.agreementRole ? agreement[p.agreementRole] : 0 }))
+    .filter((s) => s.share !== partners.find((p) => p.id === s.id)!.shareBasisPoints);
+}

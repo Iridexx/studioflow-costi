@@ -42,7 +42,7 @@ export function SharesFields({ defaultShare, others }: { defaultShare: number; o
   return (
     <div className="space-y-3 sm:col-span-2">
       <label className="block text-sm">
-        <span className="font-medium text-slate-700">Quota delle spese %</span>
+        <span className="font-medium text-slate-700">Quota per le spese %</span>
         <input
           name="share"
           inputMode="decimal"
@@ -51,7 +51,8 @@ export function SharesFields({ defaultShare, others }: { defaultShare: number; o
           className={`${inputClass} max-w-40`}
         />
         <span className="mt-1 block text-xs text-slate-500">
-          es. 50 per metà. La somma delle quote fa sempre 100%: la differenza si toglie agli altri
+          Serve solo per le spese divise «Secondo le quote dei soci»: la quota del progetto è quella
+          dell&apos;accordo (art. 3). La somma fa sempre 100%: la differenza si toglie agli altri
           soci.
         </span>
       </label>

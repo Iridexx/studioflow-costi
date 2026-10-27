@@ -6,109 +6,321 @@ import {
   Card,
   Empty,
   Field,
+  Notice,
   PageTitle,
   inputClass,
   tableClass,
   tdClass,
   thClass,
 } from "@/components/ui";
-import { dayInput, formatDay, formatEuro, formatPercent, todayDay } from "@/lib/format";
+import { SettlementList, SettlementReasons, roleLabel } from "@/components/partner-accounts";
+import {
+  dayInput,
+  formatDay,
+  formatEuro,
+  formatHours,
+  formatPercent,
+  todayDay,
+} from "@/lib/format";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 import { requirePartner } from "@/lib/session";
 import { listContributions } from "@/modules/contributions/service";
-import { listExpenses } from "@/modules/expenses/service";
+import { getAgreementTerms } from "@/modules/agreement/service";
+import { listExpenses, listUnapprovedExpenses } from "@/modules/expenses/service";
+import { splitLabel } from "@/modules/expenses/split";
 import { listPartners } from "@/modules/partners/service";
-import { partnerBalances, settlements } from "@/modules/summary/calc";
-import { addContribution, addPartner, removeContribution } from "./actions";
+import { sharesFromAgreement } from "@/modules/partners/shares";
+import {
+  hoursByPartner,
+  partnerAccounts,
+  partnerBalances,
+  paidForOthers,
+  pendingExpensesTotal,
+  settlements,
+} from "@/modules/summary/calc";
+import { listAllTimeEntries } from "@/modules/time/service";
+import { addContribution, addPartner, alignSharesToAgreement, removeContribution } from "./actions";
+
+const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
 
 export default async function PartnersPage() {
   const me = await requirePartner();
-  const [partners, expenses, contributions] = await Promise.all([
+  const [partners, expenses, unapproved, contributions, timeEntries, terms] = await Promise.all([
     listPartners(),
     listExpenses(),
+    listUnapprovedExpenses(),
     listContributions(),
+    listAllTimeEntries(),
+    getAgreementTerms(),
   ]);
   const today = todayDay();
   const active = partners.filter((p) => p.active);
   const summary = partnerBalances(partners, expenses, contributions, today);
   const toSettle = settlements(summary.balances);
+  const accounts = partnerAccounts(summary.balances, partners, timeEntries).filter(
+    (a) =>
+      a.partner.active ||
+      a.dueCents ||
+      a.paidCents ||
+      a.contributedCents ||
+      a.hours.confirmedMinutes ||
+      a.hours.pendingMinutes,
+  );
+  const forOthers = paidForOthers(partners, expenses, today);
+  const pendingExpenses = pendingExpensesTotal(unapproved);
+  const pendingHours = hoursByPartner(partners, timeEntries).total;
+  const shares = terms.shares;
+  // Le quote per dividere le spese "secondo le quote" diverse da quelle dell'accordo: lo si
+  // segnala e l'amministratore decide se allinearle, il programma non le cambia da solo.
+  const sharesToAlign = shares ? sharesFromAgreement(partners, shares) : null;
+  const totals = {
+    expenses: sum(accounts.map((a) => a.refundExpensesCents)),
+    hours: sum(accounts.map((a) => a.refundHoursCents)),
+    pendingHours: sum(accounts.map((a) => a.hours.pendingCents)),
+  };
 
   return (
     <>
       <PageTitle
-        title="Soci e versamenti"
-        subtitle="Quanto ha messo ciascuno rispetto alla sua quota delle spese sostenute fino a oggi."
+        title="Soci e conti tra soci"
+        subtitle="Quote dell'accordo, chi deve dare cosa a chi, quanto ha messo ciascuno e quanto riceverà con i ricavi."
       />
-      <Card title="Saldo tra soci" className="mb-6">
-        {summary.sharesTotal !== 10000 && (
-          <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Le quote dei soci sommano a {formatPercent(summary.sharesTotal)} invece di 100%: apri un
-            socio con Modifica e salva, il programma ricalcola le quote degli altri.
+      {summary.sharesTotal !== 10000 && (
+        <Notice>
+          Le quote per le spese sommano a {formatPercent(summary.sharesTotal)} invece di 100%: apri
+          un socio con Modifica e salva, il programma ricalcola le quote degli altri.
+        </Notice>
+      )}
+      {summary.partiesMissing && (
+        <Notice>
+          Le spese vanno a carico della Parte B (il piano per lo sviluppo diviso con la Parte A), ma
+          le parti non sono ancora scelte: l&apos;amministratore le sceglie nella pagina{" "}
+          <Link href="/accordo" className="underline">
+            Accordo
+          </Link>
+          . Intanto sono divise secondo le quote per le spese.
+        </Notice>
+      )}
+      {!shares && (
+        <Notice>
+          Nel testo dell&apos;accordo (versione {terms.versionNumber}) non trovo le quote
+          dell&apos;articolo 3 nella forma &quot;Parte A: 70%&quot;: le quote del progetto non si
+          possono mostrare.
+        </Notice>
+      )}
+      {sharesToAlign && sharesToAlign.length > 0 && shares && (
+        <Notice>
+          <p>
+            Le <strong>quote per le spese</strong> dei soci (
+            {partners
+              .filter((p) => p.shareBasisPoints > 0 || p.agreementRole)
+              .map((p) => `${p.name} ${formatPercent(p.shareBasisPoints)}`)
+              .join(", ")}
+            ) non sono quelle dell&apos;accordo: Parte A {formatPercent(shares.A)}, Parte B{" "}
+            {formatPercent(shares.B)} (art. 3). Oggi contano solo per{" "}
+            {summary.byShareCount === 0
+              ? "le spese con «Secondo le quote dei soci», e adesso non ce n'è nessuna: i conti qui sotto sono già giusti"
+              : `${summary.byShareCount} ${summary.byShareCount === 1 ? "spesa divisa" : "spese divise"} «Secondo le quote dei soci»`}
+            . Le altre spese si dividono secondo l&apos;accordo (art. 4.5 e 4.6).
           </p>
+          {me.isAdmin ? (
+            <ActionForm
+              action={alignSharesToAgreement}
+              submitLabel="Usa le quote dell'accordo"
+              className="mt-2 space-y-2"
+            />
+          ) : (
+            <p className="mt-1">Può allinearle un amministratore da questa pagina.</p>
+          )}
+        </Notice>
+      )}
+
+      <Card title="Chi deve dare cosa a chi" className="mb-6">
+        <SettlementList toSettle={toSettle} spentCents={summary.spentCents} />
+        <SettlementReasons balances={summary.balances} />
+        {forOthers.length > 0 && (
+          <details className="mt-3 text-sm">
+            <summary className="cursor-pointer text-slate-600">
+              Spese pagate anche per la parte di un altro socio ({forOthers.length})
+            </summary>
+            <div className="mt-2 overflow-x-auto">
+              <table className={tableClass}>
+                <thead>
+                  <tr>
+                    <th className={thClass}>Spesa</th>
+                    <th className={thClass}>Pagata da</th>
+                    <th className={`${thClass} text-right`}>Pagato</th>
+                    <th className={`${thClass} text-right`}>Sua parte</th>
+                    <th className={`${thClass} text-right`}>Per gli altri</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {forOthers.map((r) => (
+                    <tr key={r.expense.id}>
+                      <td className={tdClass}>
+                        <Link href={`/spese/${r.expense.id}`} className="hover:underline">
+                          {r.expense.description}
+                        </Link>
+                        <span className="block text-xs text-slate-500">
+                          {splitLabel(r.expense.partyBShareBasisPoints)}
+                          {r.chargesCount > 1 && ` · ${r.chargesCount} addebiti`}
+                        </span>
+                      </td>
+                      <td className={tdClass}>{r.payer.name}</td>
+                      <td className={`${tdClass} text-right tabular-nums`}>
+                        {formatEuro(r.paidCents)}
+                      </td>
+                      <td className={`${tdClass} text-right tabular-nums`}>
+                        {formatEuro(r.ownCents)}
+                      </td>
+                      <td className={`${tdClass} text-right font-medium tabular-nums`}>
+                        {formatEuro(r.paidCents - r.ownCents)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
         )}
-        {summary.partiesMissing && (
-          <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Le spese vanno a carico della Parte B (il piano per lo sviluppo diviso con la Parte A),
-            ma le parti non sono ancora scelte: l&apos;amministratore le sceglie nella pagina
-            Accordo. Intanto sono divise secondo le quote.
-          </p>
-        )}
+        <p className="mt-3 text-xs text-slate-500">
+          Per ora le spese le paga la Parte B, il piano per lo sviluppo 70% Parte B e 30% Parte A
+          (art. 4.5 e 4.6). Chi ha pagato anche la parte di un altro se la fa restituire subito, non
+          con i ricavi. Spese sostenute fino a oggi: {formatEuro(summary.spentCents)}
+          {summary.cashCents !== 0 && ` · Cassa comune: ${formatEuro(summary.cashCents)}`}.
+          {pendingExpenses.count > 0 &&
+            ` Non sono ancora comprese ${pendingExpenses.count} ${pendingExpenses.count === 1 ? "spesa" : "spese"} da approvare (${formatEuro(pendingExpenses.cents)}).`}
+        </p>
+      </Card>
+
+      <Card title="Conti di ogni socio" className="mb-6">
         <div className="overflow-x-auto">
           <table className={tableClass}>
             <thead>
               <tr>
                 <th className={thClass}>Socio</th>
-                <th className={`${thClass} text-right`}>Quota</th>
-                <th className={`${thClass} text-right`}>Gli spetta</th>
-                <th className={`${thClass} text-right`}>Pagato di tasca</th>
-                <th className={`${thClass} text-right`}>Versato in cassa</th>
+                <th className={`${thClass} text-right`}>Spese a suo carico</th>
+                <th className={`${thClass} text-right`}>Ha messo</th>
                 <th className={`${thClass} text-right`}>Saldo</th>
+                <th className={`${thClass} text-right`}>Ore confermate</th>
+                <th className={`${thClass} text-right`}>Ore da confermare</th>
               </tr>
             </thead>
             <tbody>
-              {summary.balances.map((b) => (
-                <tr key={b.partner.id}>
-                  <td className={tdClass}>{b.partner.name}</td>
-                  <td className={`${tdClass} text-right`}>
-                    {formatPercent(b.partner.shareBasisPoints)}
+              {accounts.map((a) => (
+                <tr key={a.partner.id}>
+                  <td className={tdClass}>
+                    {a.partner.name}
+                    <span className="block text-xs text-slate-500">
+                      {roleLabel(a.partner.agreementRole, shares)}
+                    </span>
                   </td>
-                  <td className={`${tdClass} text-right tabular-nums`}>{formatEuro(b.dueCents)}</td>
+                  <td className={`${tdClass} text-right tabular-nums`}>{formatEuro(a.dueCents)}</td>
                   <td className={`${tdClass} text-right tabular-nums`}>
-                    {formatEuro(b.paidCents)}
-                  </td>
-                  <td className={`${tdClass} text-right tabular-nums`}>
-                    {formatEuro(b.contributedCents)}
+                    {formatEuro(a.paidCents + a.contributedCents)}
+                    {a.contributedCents > 0 && (
+                      <span className="block text-xs text-slate-500">
+                        di cui {formatEuro(a.contributedCents)} in cassa
+                      </span>
+                    )}
                   </td>
                   <td
-                    className={`${tdClass} text-right font-medium tabular-nums ${b.balanceCents < 0 ? "text-red-700" : "text-emerald-700"}`}
+                    className={`${tdClass} text-right font-medium tabular-nums ${a.balanceCents < 0 ? "text-red-700" : "text-emerald-700"}`}
                   >
-                    {b.balanceCents >= 0 ? "+" : ""}
-                    {formatEuro(b.balanceCents)}
+                    {a.balanceCents > 0 ? "+" : ""}
+                    {formatEuro(a.balanceCents)}
+                  </td>
+                  <td className={`${tdClass} text-right tabular-nums`}>
+                    {formatEuro(a.hours.confirmedCents)}
+                    <span className="block text-xs text-slate-500">
+                      {formatHours(a.hours.confirmedMinutes)}
+                    </span>
+                  </td>
+                  <td className={`${tdClass} text-right tabular-nums text-amber-700`}>
+                    {a.hours.pendingMinutes > 0 ? (
+                      <>
+                        {formatEuro(a.hours.pendingCents)}
+                        <span className="block text-xs">{formatHours(a.hours.pendingMinutes)}</span>
+                      </>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-sm text-slate-600">
-          Spese sostenute fino a oggi: <strong>{formatEuro(summary.spentCents)}</strong> · Cassa
-          comune: <strong>{formatEuro(summary.cashCents)}</strong>
+        <p className="mt-2 text-xs text-slate-500">
+          Saldo positivo: ha messo più della sua parte e deve ricevere la differenza; negativo: deve
+          darla. Le ore entrano nei conti quando le hanno confermate tutti
+          {pendingHours.pendingMinutes > 0 &&
+            ` (in attesa: ${formatHours(pendingHours.pendingMinutes)})`}
+          ; non spostano il saldo, si pagano con i ricavi.
         </p>
-        {toSettle.length > 0 && (
-          <ul className="mt-3 space-y-1 rounded-md bg-sky-50 px-3 py-2 text-sm text-sky-900">
-            {toSettle.map((t) => (
-              <li key={`${t.from.id}-${t.to.id}`}>
-                <strong>{t.from.name}</strong> deve dare <strong>{formatEuro(t.cents)}</strong> a{" "}
-                <strong>{t.to.name}</strong>
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="mt-1 text-xs text-slate-500">
-          Saldo positivo: ha pagato più di quanto gli toccava. Negativo: deve dare la differenza.
-          Per ora le spese le paga la Parte B (art. 4.6), il piano per lo sviluppo 70% Parte B e 30%
-          Parte A (art. 4.5). Quello che ciascuno ha pagato per la sua parte si rimborsa poi con i
-          ricavi (art. 4.4). Le ore di lavoro non entrano nel saldo: sono nella pagina Ore.
+      </Card>
+
+      <Card title="Da ricevere con i ricavi" className="mb-6">
+        <div className="overflow-x-auto">
+          <table className={tableClass}>
+            <thead>
+              <tr>
+                <th className={thClass}>Socio</th>
+                <th className={`${thClass} text-right`}>Spese anticipate</th>
+                <th className={`${thClass} text-right`}>Ore confermate</th>
+                <th className={`${thClass} text-right`}>Totale</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accounts
+                .filter((a) => a.refundExpensesCents || a.refundHoursCents || a.hours.pendingCents)
+                .map((a) => (
+                  <tr key={a.partner.id}>
+                    <td className={tdClass}>{a.partner.name}</td>
+                    <td className={`${tdClass} text-right tabular-nums`}>
+                      {formatEuro(a.refundExpensesCents)}
+                    </td>
+                    <td className={`${tdClass} text-right tabular-nums`}>
+                      {formatEuro(a.refundHoursCents)}
+                      {a.hours.pendingCents > 0 && (
+                        <span className="block text-xs text-amber-700">
+                          + {formatEuro(a.hours.pendingCents)} se confermate
+                        </span>
+                      )}
+                    </td>
+                    <td className={`${tdClass} text-right font-medium tabular-nums`}>
+                      {formatEuro(a.refundExpensesCents + a.refundHoursCents)}
+                    </td>
+                  </tr>
+                ))}
+              <tr className="font-medium">
+                <td className={tdClass}>Totale</td>
+                <td className={`${tdClass} text-right tabular-nums`}>
+                  {formatEuro(totals.expenses)}
+                </td>
+                <td className={`${tdClass} text-right tabular-nums`}>
+                  {formatEuro(totals.hours)}
+                  {totals.pendingHours > 0 && (
+                    <span className="block text-xs font-normal text-amber-700">
+                      + {formatEuro(totals.pendingHours)} se confermate
+                    </span>
+                  )}
+                </td>
+                <td className={`${tdClass} text-right tabular-nums`}>
+                  {formatEuro(totals.expenses + totals.hours)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          Sono crediti verso il progetto, non verso l&apos;altro socio: si pagano solo con i ricavi
+          (art. 7). Dopo costi, commissioni e una riserva di 3 mesi, si rimborsano prima le spese
+          anticipate (art. 4.4), poi le ore fino al lancio al loro valore
+          {terms.hourlyRateCents ? ` di ${formatEuro(terms.hourlyRateCents)}/ora` : ""} (art. 5.3),
+          a cui va il 50% del disponibile; l&apos;altro 50% va agli utili secondo le quote del
+          progetto. Le spese anticipate sono già contate dopo i conguagli tra soci della tabella
+          sopra.
         </p>
       </Card>
 
@@ -186,7 +398,7 @@ export default async function PartnersPage() {
         )}
       </Card>
 
-      <Card title="Soci" className="mb-6">
+      <Card title="Soci e quote" className="mb-6">
         <ul className="divide-y divide-slate-100">
           {partners.map((p) => (
             <li
@@ -199,8 +411,20 @@ export default async function PartnersPage() {
                 <span className="block text-xs text-slate-500">
                   {p.username ? `accede come "${p.username}"` : "senza accesso"}
                   {p.mustChangePassword && " · non ha ancora cambiato la password provvisoria"}
-                  {p.isAdmin && " · amministratore"} · quota {formatPercent(p.shareBasisPoints)} ·{" "}
-                  {formatEuro(p.hourlyRateCents)}/ora
+                  {p.isAdmin && " · amministratore"}
+                </span>
+                <span className="block text-xs text-slate-500">
+                  {roleLabel(p.agreementRole, shares)} · quota per le spese{" "}
+                  {formatPercent(p.shareBasisPoints)} · {formatEuro(p.hourlyRateCents)}/ora
+                  {p.active &&
+                    p.agreementRole &&
+                    terms.hourlyRateCents !== null &&
+                    p.hourlyRateCents !== terms.hourlyRateCents && (
+                      <span className="text-amber-700">
+                        {" "}
+                        (l&apos;accordo dice {formatEuro(terms.hourlyRateCents)}/ora, art. 5.2)
+                      </span>
+                    )}
                 </span>
               </span>
               {me.isAdmin && (
@@ -214,6 +438,11 @@ export default async function PartnersPage() {
             </li>
           ))}
         </ul>
+        <p className="mt-2 text-xs text-slate-500">
+          La quota del progetto è quella dell&apos;accordo (art. 3): conta per gli utili. La quota
+          per le spese serve solo per le spese divise «Secondo le quote dei soci»; le altre si
+          dividono tra Parte A e Parte B come dice l&apos;accordo.
+        </p>
       </Card>
 
       {me.isAdmin && (
