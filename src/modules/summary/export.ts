@@ -1,17 +1,20 @@
 import ExcelJS from "exceljs";
 import { RECURRENCE_LABEL } from "@/lib/labels";
 import { listContributions } from "@/modules/contributions/service";
-import { listExpenses } from "@/modules/expenses/service";
+import { listExpenses, listUnapprovedExpenses } from "@/modules/expenses/service";
 import { splitLabel } from "@/modules/expenses/split";
 import { listPartners } from "@/modules/partners/service";
 import {
   charges,
   fixedMonthlyCost,
   forecast,
+  hoursByPartner,
   partnerBalances,
+  pendingExpensesTotal,
   settlements,
+  timeValueCents,
 } from "@/modules/summary/calc";
-import { listTimeEntries } from "@/modules/time/service";
+import { listAllTimeEntries } from "@/modules/time/service";
 
 const EURO = '#,##0.00 "€"';
 const DATE = "dd/mm/yyyy";
@@ -31,11 +34,12 @@ function addSheet(
 
 // Tutti i dati in un file Excel, per il commercialista o per un archivio.
 export async function buildWorkbook(today: Date): Promise<ExcelJS.Workbook> {
-  const [expenses, partners, contributions, entries] = await Promise.all([
+  const [expenses, unapproved, partners, contributions, entries] = await Promise.all([
     listExpenses(),
+    listUnapprovedExpenses(),
     listPartners(),
     listContributions(),
-    listTimeEntries(),
+    listAllTimeEntries(),
   ]);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "StudioFlow Costi";
@@ -45,12 +49,30 @@ export async function buildWorkbook(today: Date): Promise<ExcelJS.Workbook> {
     { header: "Voce", key: "label", width: 40 },
     { header: "Valore", key: "value", width: 18, style: { numFmt: EURO } },
   ]);
+  const pending = pendingExpensesTotal(unapproved);
+  const hours = hoursByPartner(partners, entries);
   totals.addRows([
     { label: "Speso dall'inizio a oggi", value: eur(summary.spentCents) },
     { label: "Costi fissi al mese", value: eur(fixedMonthlyCost(expenses, today)) },
     { label: "Previsione prossimi 12 mesi", value: eur(forecast(expenses, today)) },
+    { label: `Spese da approvare (${pending.count})`, value: eur(pending.cents) },
+    { label: "Costo ore confermate", value: eur(hours.total.confirmedCents) },
+    { label: "Costo ore da confermare", value: eur(hours.total.pendingCents) },
+    {
+      label: "Spese più ore confermate",
+      value: eur(summary.spentCents + hours.total.confirmedCents),
+    },
     { label: "Cassa comune", value: eur(summary.cashCents) },
   ]);
+  totals.addRow({});
+  totals.addRow({ label: "Costo ore per socio (confermate / da confermare)" }).font = {
+    bold: true,
+  };
+  for (const r of hours.rows) {
+    totals.addRow({ label: `${r.partner.name}, confermate`, value: eur(r.confirmedCents) });
+    if (r.pendingCents > 0)
+      totals.addRow({ label: `${r.partner.name}, da confermare`, value: eur(r.pendingCents) });
+  }
   totals.addRow({});
   totals.addRow({ label: "Saldo tra soci" }).font = { bold: true };
   for (const b of summary.balances)
@@ -118,6 +140,7 @@ export async function buildWorkbook(today: Date): Promise<ExcelJS.Workbook> {
     { header: "Ore", key: "hours", width: 8, style: { numFmt: "0.00" } },
     { header: "Costo orario", key: "rate", width: 12, style: { numFmt: EURO } },
     { header: "Valore", key: "value", width: 14, style: { numFmt: EURO } },
+    { header: "Stato", key: "status", width: 14 },
     { header: "Note", key: "notes", width: 30 },
   ]);
   for (const t of entries) {
@@ -127,7 +150,8 @@ export async function buildWorkbook(today: Date): Promise<ExcelJS.Workbook> {
       topic: t.topic,
       hours: t.minutes / 60,
       rate: eur(t.hourlyRateCents),
-      value: eur(Math.round((t.minutes * t.hourlyRateCents) / 60)),
+      value: eur(timeValueCents(t)),
+      status: t.approvedAt ? "Confermate" : "Da confermare",
       notes: t.notes ?? "",
     });
   }

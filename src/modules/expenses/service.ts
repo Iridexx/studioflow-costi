@@ -45,6 +45,14 @@ export function listExpenses() {
   });
 }
 
+// Spese ancora da approvare da qualcuno: per il riepilogo.
+export function listUnapprovedExpenses() {
+  return prisma.expense.findMany({
+    where: { approvedAt: null },
+    select: { id: true, amountCents: true },
+  });
+}
+
 export function getExpense(id: string) {
   return prisma.expense.findUnique({
     where: { id },

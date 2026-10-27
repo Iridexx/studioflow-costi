@@ -12,7 +12,7 @@ import {
 import { formatEuro, formatHours, monthName, todayDay } from "@/lib/format";
 import { RECURRENCE_LABEL } from "@/lib/labels";
 import { listContributions } from "@/modules/contributions/service";
-import { listCategories, listExpenses } from "@/modules/expenses/service";
+import { listCategories, listExpenses, listUnapprovedExpenses } from "@/modules/expenses/service";
 import { listPartners } from "@/modules/partners/service";
 import { getPilotStudios } from "@/modules/settings/service";
 import {
@@ -20,11 +20,14 @@ import {
   categoryTotals,
   fixedMonthlyCost,
   forecast,
+  hoursByPartner,
   monthlyTotals,
   partnerBalances,
+  pendingExpensesTotal,
   settlements,
+  type HoursTotals,
 } from "@/modules/summary/calc";
-import { listTimeEntries } from "@/modules/time/service";
+import { listAllTimeEntries } from "@/modules/time/service";
 
 export default async function SummaryPage({
   searchParams,
@@ -34,13 +37,14 @@ export default async function SummaryPage({
   const params = await searchParams;
   const today = todayDay();
   const year = Number(params.anno) || today.getUTCFullYear();
-  const [expenses, categories, partners, contributions, timeEntries, pilotStudios] =
+  const [expenses, unapproved, categories, partners, contributions, timeEntries, pilotStudios] =
     await Promise.all([
       listExpenses(),
+      listUnapprovedExpenses(),
       listCategories(),
       listPartners(),
       listContributions(),
-      listTimeEntries(),
+      listAllTimeEntries(),
       getPilotStudios(),
     ]);
 
@@ -57,17 +61,10 @@ export default async function SummaryPage({
   const years = new Set<number>([today.getUTCFullYear()]);
   for (const e of expenses) years.add(e.date.getUTCFullYear());
 
-  const yearEntries = timeEntries.filter((e) => e.date.getUTCFullYear() === year);
-  const hoursByPartner = partners
-    .map((p) => {
-      const mine = yearEntries.filter((e) => e.partnerId === p.id);
-      return {
-        partner: p,
-        minutes: mine.reduce((a, e) => a + e.minutes, 0),
-        value: mine.reduce((a, e) => a + Math.round((e.minutes * e.hourlyRateCents) / 60), 0),
-      };
-    })
-    .filter((r) => r.minutes > 0);
+  const pendingExpenses = pendingExpensesTotal(unapproved);
+  // Le ore dall'inizio servono per il totale; quelle dell'anno per la tabella.
+  const allHours = hoursByPartner(partners, timeEntries).total;
+  const yearHours = hoursByPartner(partners, timeEntries, year);
 
   return (
     <>
@@ -120,6 +117,25 @@ export default async function SummaryPage({
           label="Previsione prossimi 12 mesi"
           value={formatEuro(forecast(expenses, today))}
           hint="Abbonamenti attivi e spese con data futura"
+        />
+        <Stat
+          label="Spese da approvare"
+          value={formatEuro(pendingExpenses.cents)}
+          hint={
+            pendingExpenses.count === 0
+              ? "Nessuna spesa in attesa"
+              : `${pendingExpenses.count} ${pendingExpenses.count === 1 ? "spesa" : "spese"} in attesa, non ancora nei conti (abbonamenti contati per una rata)`
+          }
+        />
+        <Stat
+          label="Costo ore dall'inizio a oggi"
+          value={formatEuro(allHours.confirmedCents)}
+          hint={`${formatHours(allHours.confirmedMinutes)} confermate da tutti${allHours.pendingMinutes > 0 ? `; altre ${formatHours(allHours.pendingMinutes)} da confermare (${formatEuro(allHours.pendingCents)})` : ""}`}
+        />
+        <Stat
+          label="Spese più ore"
+          value={formatEuro(balances.spentCents + allHours.confirmedCents)}
+          hint="Speso a oggi più il costo delle ore confermate"
         />
         <Stat
           label="Cassa comune"
@@ -226,20 +242,44 @@ export default async function SummaryPage({
         </Card>
 
         <Card title={`Ore di lavoro · ${year}`}>
-          {hoursByPartner.length === 0 ? (
-            <Empty>Nessuna ora registrata.</Empty>
+          {yearHours.rows.length === 0 ? (
+            <Empty>
+              Nessuna ora registrata.{" "}
+              <Link href="/ore" className="underline">
+                Registra le ore
+              </Link>
+              .
+            </Empty>
           ) : (
-            <table className={tableClass}>
-              <tbody>
-                {hoursByPartner.map((r) => (
-                  <tr key={r.partner.id}>
-                    <td className={tdClass}>{r.partner.name}</td>
-                    <td className={`${tdClass} text-right`}>{formatHours(r.minutes)}</td>
-                    <td className={`${tdClass} text-right tabular-nums`}>{formatEuro(r.value)}</td>
+            <>
+              <table className={tableClass}>
+                <thead>
+                  <tr>
+                    <th className={thClass}>Socio</th>
+                    <th className={`${thClass} text-right`}>Confermate</th>
+                    <th className={`${thClass} text-right`}>Da confermare</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {yearHours.rows.map((r) => (
+                    <HoursRow key={r.partner.id} label={r.partner.name} hours={r} />
+                  ))}
+                  {yearHours.rows.length > 1 && (
+                    <HoursRow label="Totale" hours={yearHours.total} strong />
+                  )}
+                </tbody>
+              </table>
+              <p className="mt-2 text-xs text-slate-500">
+                Ore al costo orario di ogni socio. Entrano nei conti quando le hanno confermate
+                tutti.
+              </p>
+              <Link
+                href="/ore"
+                className="mt-3 inline-block text-sm text-slate-500 hover:underline"
+              >
+                Dettaglio ore →
+              </Link>
+            </>
           )}
         </Card>
 
@@ -277,5 +317,37 @@ export default async function SummaryPage({
         </Card>
       </div>
     </>
+  );
+}
+
+function HoursRow({
+  label,
+  hours,
+  strong,
+}: {
+  label: string;
+  hours: HoursTotals;
+  strong?: boolean;
+}) {
+  return (
+    <tr className={strong ? "font-medium" : undefined}>
+      <td className={tdClass}>{label}</td>
+      <td className={`${tdClass} text-right tabular-nums`}>
+        {formatEuro(hours.confirmedCents)}
+        <span className="block text-xs font-normal text-slate-500">
+          {formatHours(hours.confirmedMinutes)}
+        </span>
+      </td>
+      <td className={`${tdClass} text-right tabular-nums text-amber-700`}>
+        {hours.pendingMinutes > 0 ? (
+          <>
+            {formatEuro(hours.pendingCents)}
+            <span className="block text-xs font-normal">{formatHours(hours.pendingMinutes)}</span>
+          </>
+        ) : (
+          <span className="text-slate-400">—</span>
+        )}
+      </td>
+    </tr>
   );
 }

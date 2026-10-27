@@ -69,4 +69,36 @@ describe("testo del riepilogo", () => {
     expect(d?.body).toContain("1 h 30 · Riunione");
     expect(d?.body).toContain("http://ufficio-pc:3100");
   });
+
+  it("in fondo la situazione: spese da approvare e costo delle ore", () => {
+    const d = buildDigest({
+      day: "2026-10-25",
+      appUrl: "x",
+      expenses: [],
+      timeEntries: [
+        {
+          date: new Date("2026-10-25T00:00:00Z"),
+          partner: "Marco",
+          minutes: 60,
+          topic: "Sviluppo",
+          valueCents: 6000,
+          approved: false,
+        },
+      ],
+      status: {
+        spentCents: 10000,
+        pendingExpenses: { count: 2, cents: 4500 },
+        hours: {
+          confirmedMinutes: 120,
+          confirmedCents: 12000,
+          pendingMinutes: 60,
+          pendingCents: 6000,
+        },
+      },
+    });
+    expect(d?.body).toContain("Spese da approvare: 2 per 45,00");
+    expect(d?.body).toContain("Costo ore confermate: 120,00");
+    expect(d?.body).toContain("Costo ore da confermare: 60,00");
+    expect(d?.body).toContain("Spese più ore confermate: 220,00");
+  });
 });

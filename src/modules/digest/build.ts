@@ -1,6 +1,7 @@
 // Testo dell'email di riepilogo con le spese e le ore inserite, senza database.
 import { formatDay, formatEuro, formatHours } from "@/lib/format";
 import { RECURRENCE_LABEL } from "@/lib/labels";
+import type { HoursTotals } from "@/modules/summary/calc";
 
 export type DigestExpense = {
   date: Date;
@@ -20,11 +21,19 @@ export type DigestTimeEntry = {
   approved: boolean;
 };
 
+// Situazione dei conti al momento dell'invio, in fondo all'email.
+export type DigestStatus = {
+  spentCents: number;
+  pendingExpenses: { count: number; cents: number };
+  hours: HoursTotals;
+};
+
 export function buildDigest(input: {
   day: string;
   expenses: DigestExpense[];
   timeEntries: DigestTimeEntry[];
   appUrl: string;
+  status?: DigestStatus;
 }): { subject: string; body: string } | null {
   const { expenses, timeEntries } = input;
   if (expenses.length === 0 && timeEntries.length === 0) return null;
@@ -46,6 +55,18 @@ export function buildDigest(input: {
         `- ${formatDay(t.date)} · ${t.partner} · ${formatHours(t.minutes)} · ${t.topic} · ${formatEuro(t.valueCents)} · ${t.approved ? "confermate" : "da confermare"}`,
       );
     lines.push("");
+  }
+  if (input.status) {
+    const { spentCents, pendingExpenses, hours } = input.status;
+    lines.push(
+      "SITUAZIONE A OGGI",
+      `- Speso: ${formatEuro(spentCents)}`,
+      `- Spese da approvare: ${pendingExpenses.count} per ${formatEuro(pendingExpenses.cents)}`,
+      `- Costo ore confermate: ${formatEuro(hours.confirmedCents)} (${formatHours(hours.confirmedMinutes)})`,
+      `- Costo ore da confermare: ${formatEuro(hours.pendingCents)} (${formatHours(hours.pendingMinutes)})`,
+      `- Spese più ore confermate: ${formatEuro(spentCents + hours.confirmedCents)}`,
+      "",
+    );
   }
   const pending =
     expenses.filter((e) => !e.approved).length + timeEntries.filter((t) => !t.approved).length;
