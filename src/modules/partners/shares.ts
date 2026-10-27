@@ -40,3 +40,19 @@ export function sharesProblem(shares: number[]): string | null {
   const pct = (total / 100).toLocaleString("it-IT", { maximumFractionDigits: 2 });
   return `Le quote sommano a ${pct}% invece di 100%: correggile prima di salvare.`;
 }
+
+// Quote per le spese come dice l'accordo (art. 4.6): per ora le spese le paga tutte la Parte B,
+// quindi Parte B 100% e gli altri 0% (il piano per lo sviluppo, 70% B e 30% A, ha la sua
+// ripartizione sulla spesa). Solo i soci la cui quota cambia; null se le parti non sono scelte.
+export function expenseSharesFromAgreement(
+  partners: { id: string; shareBasisPoints: number; agreementRole: "A" | "B" | null }[],
+): Share[] | null {
+  if (
+    !partners.some((p) => p.agreementRole === "A") ||
+    !partners.some((p) => p.agreementRole === "B")
+  )
+    return null;
+  return partners
+    .map((p) => ({ id: p.id, share: p.agreementRole === "B" ? FULL_SHARE : 0 }))
+    .filter((s) => s.share !== partners.find((p) => p.id === s.id)!.shareBasisPoints);
+}

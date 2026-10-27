@@ -32,7 +32,7 @@ import {
 } from "@/modules/partners/service";
 import { isMailConfigured, sendMail } from "@/modules/mail/service";
 import { buildInvite } from "@/modules/partners/invite";
-import { sharesProblem } from "@/modules/partners/shares";
+import { expenseSharesFromAgreement, sharesProblem } from "@/modules/partners/shares";
 
 async function readPartner(form: FormData, exceptId?: string): Promise<PartnerInput> {
   const username = text(form, "username").toLowerCase() || null;
@@ -166,6 +166,20 @@ export async function editPartner(id: string, _: FormState, form: FormData): Pro
       me,
       `Salvato: al prossimo accesso ${input.name} dovrà cambiare la password.`,
     );
+  });
+}
+
+// Su richiesta dell'amministratore: le quote per le spese diventano quelle dell'accordo (art.
+// 4.6, tutto alla Parte B). Il programma non le cambia mai da solo.
+export async function alignSharesToAgreement(): Promise<FormState> {
+  await requireAdmin();
+  return handle(async () => {
+    const changes = expenseSharesFromAgreement(await listPartners());
+    if (!changes) throw new FormError("Prima scegli la Parte A e la Parte B nella pagina Accordo.");
+    if (changes.length === 0) return "Le quote per le spese sono già quelle dell'accordo.";
+    await setShares(changes);
+    revalidatePath("/", "layout");
+    return "Quote per le spese aggiornate: Parte B 100%, come nell'accordo.";
   });
 }
 

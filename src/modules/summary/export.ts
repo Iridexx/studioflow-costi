@@ -9,6 +9,7 @@ import {
   fixedMonthlyCost,
   forecast,
   hoursByPartner,
+  partnerAccounts,
   partnerBalances,
   pendingExpensesTotal,
   settlements,
@@ -79,6 +80,16 @@ export async function buildWorkbook(today: Date): Promise<ExcelJS.Workbook> {
     totals.addRow({ label: b.partner.name, value: eur(b.balanceCents) });
   for (const t of settlements(summary.balances))
     totals.addRow({ label: `${t.from.name} deve dare a ${t.to.name}`, value: eur(t.cents) });
+  totals.addRow({});
+  totals.addRow({ label: "Da ricevere con i ricavi (art. 7)" }).font = { bold: true };
+  for (const a of partnerAccounts(summary.balances, partners, entries)) {
+    if (!a.refundExpensesCents && !a.refundHoursCents) continue;
+    totals.addRow({
+      label: `${a.partner.name}, spese anticipate`,
+      value: eur(a.refundExpensesCents),
+    });
+    totals.addRow({ label: `${a.partner.name}, ore confermate`, value: eur(a.refundHoursCents) });
+  }
 
   const chargeSheet = addSheet(workbook, "Addebiti fino a oggi", [
     { header: "Data", key: "date", width: 12, style: { numFmt: DATE } },

@@ -6,6 +6,8 @@ import {
   forecast,
   hoursByPartner,
   monthlyTotals,
+  paidForOthers,
+  partnerAccounts,
   partnerBalances,
   pendingExpensesTotal,
   settlements,
@@ -164,6 +166,72 @@ describe("riepilogo", () => {
     expect(s[0].from.id).toBe("b");
     expect(s[0].to.id).toBe("a");
     expect(s[0].cents).toBe(7686);
+  });
+});
+
+describe("conti di ogni socio", () => {
+  const today = d("2026-10-24");
+  // Come nei dati di Eifel: quote per le spese 50/50, ma le spese si dividono secondo l'accordo.
+  const partners = [
+    { id: "a", name: "Marco", shareBasisPoints: 5000, agreementRole: "A" as const },
+    { id: "b", name: "Steve", shareBasisPoints: 5000, agreementRole: "B" as const },
+  ];
+  const claude = expense({
+    id: "claude",
+    amountCents: 10980,
+    recurrence: "MONTHLY",
+    date: d("2026-08-20"),
+    paidById: "a",
+    partyBShareBasisPoints: 7000,
+  });
+  const domain = expense({
+    id: "dominio",
+    amountCents: 2440,
+    date: d("2026-09-01"),
+    paidById: "b",
+    partyBShareBasisPoints: 10000,
+  });
+
+  it("con le parti scelte le quote per le spese non contano", () => {
+    const r = partnerBalances(partners, [claude, domain], [], today);
+    // Tre mesi di Claude (ago, set, ott): 30% Marco, 70% Steve; il dominio tutto a Steve.
+    expect(r.balances[0].dueCents).toBe(9882);
+    expect(r.balances[1].dueCents).toBe(23058 + 2440);
+    expect(r.byShareCount).toBe(0);
+    const s = settlements(r.balances);
+    expect(s).toEqual([{ from: partners[1], to: partners[0], cents: 32940 - 9882 }]);
+  });
+
+  it("conta le spese divise secondo le quote", () => {
+    const byShares = expense({
+      amountCents: 1000,
+      date: d("2026-09-01"),
+      partyBShareBasisPoints: null,
+    });
+    expect(partnerBalances(partners, [claude, byShares], [], today).byShareCount).toBe(1);
+  });
+
+  it("spiega le spese pagate anche per l'altro socio", () => {
+    const rows = paidForOthers(partners, [claude, domain], today);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      payer: partners[0],
+      chargesCount: 3,
+      paidCents: 32940,
+      ownCents: 9882,
+    });
+  });
+
+  it("da ricevere con i ricavi: spese dopo i conguagli e ore confermate", () => {
+    const balances = partnerBalances(partners, [claude, domain], [], today).balances;
+    const entries = [
+      { partnerId: "a", date: today, minutes: 120, hourlyRateCents: 6000, approvedAt: today },
+      { partnerId: "a", date: today, minutes: 60, hourlyRateCents: 6000, approvedAt: null },
+    ];
+    const [marco, steve] = partnerAccounts(balances, partners, entries);
+    expect(marco).toMatchObject({ refundExpensesCents: 9882, refundHoursCents: 12000 });
+    expect(marco.hours.pendingCents).toBe(6000);
+    expect(steve).toMatchObject({ refundExpensesCents: 25498, refundHoursCents: 0 });
   });
 });
 

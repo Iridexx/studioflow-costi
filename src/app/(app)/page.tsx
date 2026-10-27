@@ -9,6 +9,7 @@ import {
   tdClass,
   thClass,
 } from "@/components/ui";
+import { SettlementList } from "@/components/partner-accounts";
 import { formatEuro, formatHours, monthName, todayDay } from "@/lib/format";
 import { RECURRENCE_LABEL } from "@/lib/labels";
 import { requirePartner } from "@/lib/session";
@@ -23,6 +24,7 @@ import {
   forecast,
   hoursByPartner,
   monthlyTotals,
+  partnerAccounts,
   partnerBalances,
   pendingExpensesTotal,
   settlements,
@@ -68,6 +70,9 @@ export default async function SummaryPage({
   // Le ore dall'inizio servono per il totale; quelle dell'anno per la tabella.
   const allHours = hoursByPartner(partners, timeEntries).total;
   const yearHours = hoursByPartner(partners, timeEntries, year);
+  const accounts = partnerAccounts(balances.balances, partners, timeEntries).filter(
+    (a) => a.dueCents || a.paidCents || a.contributedCents || a.refundHoursCents,
+  );
 
   return (
     <>
@@ -216,31 +221,47 @@ export default async function SummaryPage({
           )}
         </Card>
 
-        <Card title="Saldo tra soci (a oggi)">
-          <table className={tableClass}>
+        <Card title="Chi deve dare cosa a chi (a oggi)">
+          <SettlementList
+            toSettle={settlements(balances.balances)}
+            spentCents={balances.spentCents}
+            size="small"
+          />
+          <table className={`${tableClass} mt-3`}>
+            <thead>
+              <tr>
+                <th className={thClass}>Socio</th>
+                <th className={`${thClass} text-right`}>Saldo spese</th>
+                <th className={`${thClass} text-right`}>Da ricevere con i ricavi</th>
+              </tr>
+            </thead>
             <tbody>
-              {balances.balances
-                .filter((b) => b.partner.shareBasisPoints > 0 || b.paidCents || b.contributedCents)
-                .map((b) => (
-                  <tr key={b.partner.id}>
-                    <td className={tdClass}>{b.partner.name}</td>
-                    <td
-                      className={`${tdClass} text-right font-medium tabular-nums ${b.balanceCents < 0 ? "text-red-700" : "text-emerald-700"}`}
-                    >
-                      {b.balanceCents >= 0 ? "+" : ""}
-                      {formatEuro(b.balanceCents)}
-                    </td>
-                  </tr>
-                ))}
+              {accounts.map((a) => (
+                <tr key={a.partner.id}>
+                  <td className={tdClass}>{a.partner.name}</td>
+                  <td
+                    className={`${tdClass} text-right font-medium tabular-nums ${a.balanceCents < 0 ? "text-red-700" : "text-emerald-700"}`}
+                  >
+                    {a.balanceCents > 0 ? "+" : ""}
+                    {formatEuro(a.balanceCents)}
+                  </td>
+                  <td className={`${tdClass} text-right tabular-nums`}>
+                    {formatEuro(a.refundExpensesCents + a.refundHoursCents)}
+                    <span className="block text-xs text-slate-500">
+                      spese {formatEuro(a.refundExpensesCents)} + ore{" "}
+                      {formatEuro(a.refundHoursCents)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
-          {settlements(balances.balances).map((t) => (
-            <p key={`${t.from.id}-${t.to.id}`} className="mt-2 text-sm text-sky-900">
-              {t.from.name} deve dare <strong>{formatEuro(t.cents)}</strong> a {t.to.name}
-            </p>
-          ))}
+          <p className="mt-2 text-xs text-slate-500">
+            Il conguaglio tra soci si fa subito (art. 4.6); spese anticipate e ore confermate si
+            pagano solo con i ricavi del progetto (art. 7).
+          </p>
           <Link href="/soci" className="mt-3 inline-block text-sm text-slate-500 hover:underline">
-            Dettaglio e versamenti →
+            Dettaglio, quote e versamenti →
           </Link>
         </Card>
 
