@@ -51,6 +51,7 @@ export default async function ExpensesPage({
           <ExpenseFields
             categories={categories.filter((c) => c.active)}
             partners={partners}
+            defaultPaidById={partners.find((p) => p.agreementRole === "B")?.id}
             attachmentRequired={attachmentRequired}
           />
         </ActionForm>

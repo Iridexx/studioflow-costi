@@ -2,7 +2,12 @@ import { AttachmentInput } from "@/components/attachment-input";
 import { Field, inputClass } from "@/components/ui";
 import { dayInput, euroInput } from "@/lib/format";
 import { ATTACHMENT_HINT, formatFileSize } from "@/modules/expenses/attachments";
-import { DEVELOPMENT_PLAN_PARTY_B_SHARE, splitLabel } from "@/modules/expenses/split";
+import {
+  AUTOMATIC_SPLIT,
+  DEVELOPMENT_PLAN_PARTY_B_SHARE,
+  PARTY_B_ALL,
+  splitLabel,
+} from "@/modules/expenses/split";
 
 type Option = { id: string; name: string };
 
@@ -30,9 +35,12 @@ export function ExpenseFields({
   defaults,
   attachmentRequired,
   attachments = [],
+  defaultPaidById,
 }: {
   categories: Option[];
   partners: Option[];
+  // Per una spesa nuova: chi la paga di solito (la Parte B dell'accordo).
+  defaultPaidById?: string;
   defaults?: ExpenseDefaults;
   attachmentRequired: boolean;
   attachments?: AttachmentInfo[];
@@ -97,7 +105,11 @@ export function ExpenseFields({
         </select>
       </Field>
       <Field label="Pagata da">
-        <select name="paidById" defaultValue={defaults?.paidById ?? ""} className={inputClass}>
+        <select
+          name="paidById"
+          defaultValue={defaults ? (defaults.paidById ?? "") : (defaultPaidById ?? "")}
+          className={inputClass}
+        >
           <option value="">Cassa comune</option>
           {partners.map((p) => (
             <option key={p.id} value={p.id}>
@@ -109,22 +121,27 @@ export function ExpenseFields({
       <div className="sm:col-span-2">
         <Field
           label="Chi ne sostiene il costo"
-          hint="Il piano per lo sviluppo segue l'art. 4.5 dell'accordo"
+          hint="Come dice l'accordo: tutto la Parte B, il piano Claude 70% B e 30% A. Cambialo solo per accordi diversi."
         >
           <select
             name="split"
-            defaultValue={defaults?.partyBShareBasisPoints?.toString() ?? ""}
+            defaultValue={
+              defaults ? (defaults.partyBShareBasisPoints?.toString() ?? "") : AUTOMATIC_SPLIT
+            }
             className={inputClass}
           >
-            <option value="">Secondo le quote dei soci</option>
-            {[DEVELOPMENT_PLAN_PARTY_B_SHARE, defaults?.partyBShareBasisPoints]
+            {!defaults && (
+              <option value={AUTOMATIC_SPLIT}>In automatico secondo l&apos;accordo</option>
+            )}
+            {[PARTY_B_ALL, DEVELOPMENT_PLAN_PARTY_B_SHARE, defaults?.partyBShareBasisPoints]
               .filter((v, i, all): v is number => v != null && all.indexOf(v) === i)
               .map((v) => (
                 <option key={v} value={v}>
                   {v === DEVELOPMENT_PLAN_PARTY_B_SHARE ? "Piano per lo sviluppo: " : ""}
-                  {splitLabel(v)}
+                  {splitLabel(v).replace(/^t/, "T")}
                 </option>
               ))}
+            <option value="">Secondo le quote dei soci</option>
           </select>
         </Field>
       </div>
