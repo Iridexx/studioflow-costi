@@ -16,6 +16,20 @@ export type ExpenseInput = {
   notes: string | null;
 };
 
+// File già controllato (tipo riconosciuto dal contenuto, dimensione nei limiti).
+export type NewAttachment = {
+  fileName: string;
+  contentType: string;
+  size: number;
+  data: Uint8Array<ArrayBuffer>;
+};
+
+// Dati dell'allegato senza il file: per gli elenchi.
+const attachmentInfo = {
+  select: { id: true, fileName: true, contentType: true, size: true, createdAt: true },
+  orderBy: { createdAt: "asc" },
+} as const;
+
 const include = {
   category: { select: { name: true } },
   paidBy: { select: { name: true } },
@@ -26,7 +40,7 @@ const include = {
 export function listExpenses() {
   return prisma.expense.findMany({
     where: { approvedAt: { not: null } },
-    include,
+    include: { ...include, _count: { select: { attachments: true } } },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
 }
@@ -37,6 +51,7 @@ export function getExpense(id: string) {
     include: {
       ...include,
       approvals: { select: { partnerId: true, createdAt: true } },
+      attachments: attachmentInfo,
       messages: {
         include: { author: { select: { name: true } } },
         orderBy: { createdAt: "asc" },
@@ -63,7 +78,7 @@ export async function listPendingExpenses(partnerId: string) {
         ...include,
         approvals: { select: { partnerId: true } },
         messages: { select: { authorId: true }, orderBy: { createdAt: "desc" }, take: 1 },
-        _count: { select: { messages: true } },
+        _count: { select: { messages: true, attachments: true } },
       },
       orderBy: [{ createdAt: "desc" }],
     }),
@@ -76,7 +91,14 @@ export async function listPendingExpenses(partnerId: string) {
     );
     const mustApprove = missing.some((p) => p.id === partnerId);
     const mustReply = awaitsReply(e.createdById, partnerId, e.messages[0]?.authorId ?? null);
-    return { expense: e, missing, mustApprove, mustReply, messages: e._count.messages };
+    return {
+      expense: e,
+      missing,
+      mustApprove,
+      mustReply,
+      messages: e._count.messages,
+      attachments: e._count.attachments,
+    };
   });
 }
 
@@ -115,22 +137,45 @@ export async function settlePendingExpenses() {
   for (const e of pending) await settle(e.id);
 }
 
-export async function createExpense(input: ExpenseInput, createdById: string) {
+export async function createExpense(
+  input: ExpenseInput,
+  createdById: string,
+  attachments: NewAttachment[] = [],
+) {
   const expense = await prisma.expense.create({
-    data: { ...input, createdById, approvals: { create: { partnerId: createdById } } },
+    data: {
+      ...input,
+      createdById,
+      approvals: { create: { partnerId: createdById } },
+      attachments: { create: attachments.map((a) => ({ ...a, createdById })) },
+    },
   });
   await settle(expense.id);
   return expense;
 }
 
 // Una modifica cancella le approvazioni: la spesa torna in attesa, approvata solo da chi l'ha
-// modificata, e gli altri soci devono rivederla.
-export async function updateExpense(id: string, input: ExpenseInput, editorId: string) {
+// modificata, e gli altri soci devono rivederla. Anche aggiungere o togliere un allegato è una
+// modifica.
+export async function updateExpense(
+  id: string,
+  input: ExpenseInput,
+  editorId: string,
+  attachments: { add: NewAttachment[]; removeIds: string[] } = { add: [], removeIds: [] },
+) {
   await prisma.$transaction([
     prisma.expenseApproval.deleteMany({ where: { expenseId: id } }),
+    prisma.expenseAttachment.deleteMany({
+      where: { expenseId: id, id: { in: attachments.removeIds } },
+    }),
     prisma.expense.update({
       where: { id },
-      data: { ...input, approvedAt: null, approvals: { create: { partnerId: editorId } } },
+      data: {
+        ...input,
+        approvedAt: null,
+        approvals: { create: { partnerId: editorId } },
+        attachments: { create: attachments.add.map((a) => ({ ...a, createdById: editorId })) },
+      },
     }),
   ]);
   await settle(id);
@@ -173,4 +218,13 @@ export async function categoryNameTaken(name: string, exceptId?: string) {
     where: { name: { equals: name, mode: "insensitive" } },
   });
   return !!found && found.id !== exceptId;
+}
+
+export function listAttachmentIds(expenseId: string) {
+  return prisma.expenseAttachment.findMany({ where: { expenseId }, select: { id: true } });
+}
+
+// L'allegato con il file, per aprirlo o scaricarlo.
+export function getAttachment(id: string) {
+  return prisma.expenseAttachment.findUnique({ where: { id } });
 }

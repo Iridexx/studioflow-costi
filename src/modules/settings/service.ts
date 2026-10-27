@@ -36,3 +36,19 @@ export async function setAppUrl(value: string | null) {
     update: { value },
   });
 }
+
+const ATTACHMENT_REQUIRED = "expenseAttachmentRequired";
+
+// Allegato (ricevuta o giustificativo) obbligatorio per registrare una spesa. Di base sì.
+export async function getAttachmentRequired(): Promise<boolean> {
+  const row = await prisma.setting.findUnique({ where: { key: ATTACHMENT_REQUIRED } });
+  return row?.value !== "false";
+}
+
+export async function setAttachmentRequired(value: boolean) {
+  await prisma.setting.upsert({
+    where: { key: ATTACHMENT_REQUIRED },
+    create: { key: ATTACHMENT_REQUIRED, value: String(value) },
+    update: { value: String(value) },
+  });
+}

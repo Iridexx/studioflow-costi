@@ -19,6 +19,8 @@ const nextConfig: NextConfig = {
     serverActions: {
       // Dietro `tailscale serve` l'host inoltrato può differire dall'origine del browser.
       allowedOrigins: allowedActionOrigins(),
+      // Spazio per gli allegati delle spese: fino a 5 file da 10 MB, più i campi del modulo.
+      bodySizeLimit: "52mb",
     },
   },
 };

@@ -5,7 +5,7 @@ import { requirePartner } from "@/lib/session";
 import { listCategories } from "@/modules/expenses/service";
 import { MailSettingsForm } from "@/components/mail-settings-form";
 import { getMailSettings } from "@/modules/mail/service";
-import { getAppUrl, getPilotStudios } from "@/modules/settings/service";
+import { getAppUrl, getAttachmentRequired, getPilotStudios } from "@/modules/settings/service";
 import { getDigestSettings } from "@/modules/digest/service";
 import { listTopics } from "@/modules/time/service";
 import {
@@ -18,20 +18,23 @@ import {
   saveDigest,
   sendDigestNow,
   saveAppUrl,
+  saveAttachmentRequired,
   saveMailSetup,
   savePilotStudios,
 } from "./actions";
 
 export default async function SettingsPage() {
   const me = await requirePartner();
-  const [categories, pilotStudios, appUrl, mail, topics, digest] = await Promise.all([
-    listCategories(),
-    getPilotStudios(),
-    getAppUrl(),
-    getMailSettings(),
-    listTopics(),
-    getDigestSettings(),
-  ]);
+  const [categories, pilotStudios, appUrl, mail, topics, digest, attachmentRequired] =
+    await Promise.all([
+      listCategories(),
+      getPilotStudios(),
+      getAppUrl(),
+      getMailSettings(),
+      listTopics(),
+      getDigestSettings(),
+      getAttachmentRequired(),
+    ]);
   return (
     <>
       <PageTitle title="Impostazioni" />
@@ -83,6 +86,22 @@ export default async function SettingsPage() {
                   className={inputClass}
                 />
               </Field>
+            </ActionForm>
+          </Card>
+        )}
+
+        {me.isAdmin && (
+          <Card title="Ricevute delle spese">
+            <p className="mb-4 text-sm text-slate-500">
+              Ogni spesa può avere fino a 5 allegati (PDF o foto, fino a 10 MB ciascuno), che i soci
+              vedono prima di approvarla. Sono salvati nel database, quindi finiscono anche nel
+              backup notturno. Le spese registrate prima restano valide anche senza allegato.
+            </p>
+            <ActionForm action={saveAttachmentRequired} submitLabel="Salva" resetOnSuccess={false}>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="required" defaultChecked={attachmentRequired} />{" "}
+                Allegato obbligatorio: senza ricevuta o giustificativo la spesa non si registra
+              </label>
             </ActionForm>
           </Card>
         )}

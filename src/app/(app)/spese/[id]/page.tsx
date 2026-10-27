@@ -10,6 +10,8 @@ import { missingApprovers } from "@/modules/expenses/approval";
 import { getExpense, listApprovers, listCategories } from "@/modules/expenses/service";
 import { splitLabel } from "@/modules/expenses/split";
 import { listPartners } from "@/modules/partners/service";
+import { attachmentRequired, formatFileSize, isImage } from "@/modules/expenses/attachments";
+import { getAttachmentRequired } from "@/modules/settings/service";
 import { approve, editExpense, removeExpense, sendMessage } from "../actions";
 
 const dateTime = new Intl.DateTimeFormat("it-IT", {
@@ -24,13 +26,18 @@ const dateTime = new Intl.DateTimeFormat("it-IT", {
 export default async function ExpensePage({ params }: { params: Promise<{ id: string }> }) {
   const me = await requirePartner();
   const { id } = await params;
-  const [expense, categories, partners, approvers] = await Promise.all([
+  const [expense, categories, partners, approvers, requiredSetting] = await Promise.all([
     getExpense(id),
     listCategories(),
     listPartners(),
     listApprovers(),
+    getAttachmentRequired(),
   ]);
   if (!expense) notFound();
+  const required = attachmentRequired(requiredSetting, {
+    isNew: false,
+    attachmentsBefore: expense.attachments.length,
+  });
   const approvedBy = new Set(expense.approvals.map((a) => a.partnerId));
   const missing = missingApprovers(approvers, approvedBy);
   const mustApprove = !expense.approvedAt && missing.some((p) => p.id === me.id);
@@ -93,6 +100,59 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
         )}
       </Card>
 
+      <Card title="Ricevute e giustificativi" className="mb-6">
+        {expense.attachments.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            Nessun allegato.
+            {requiredSetting &&
+              " La spesa è stata registrata prima che l'allegato fosse obbligatorio: puoi aggiungerlo da Modifica."}
+          </p>
+        ) : (
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {expense.attachments.map((a) => (
+              <li key={a.id} className="rounded-md border border-slate-200 p-3 text-sm">
+                {isImage(a.contentType) ? (
+                  <a href={`/allegati/${a.id}`} target="_blank" rel="noopener">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`/allegati/${a.id}`}
+                      alt={a.fileName}
+                      className="mb-2 h-40 w-full rounded bg-slate-50 object-contain"
+                    />
+                  </a>
+                ) : (
+                  <a
+                    href={`/allegati/${a.id}`}
+                    target="_blank"
+                    rel="noopener"
+                    className="mb-2 flex h-40 items-center justify-center rounded bg-slate-50 text-3xl font-semibold text-red-700"
+                  >
+                    PDF
+                  </a>
+                )}
+                <p className="truncate font-medium text-slate-900" title={a.fileName}>
+                  {a.fileName}
+                </p>
+                <p className="text-xs text-slate-500">{formatFileSize(a.size)}</p>
+                <p className="mt-2 flex gap-3">
+                  <a
+                    href={`/allegati/${a.id}`}
+                    target="_blank"
+                    rel="noopener"
+                    className="text-slate-900 underline"
+                  >
+                    Apri
+                  </a>
+                  <a href={`/allegati/${a.id}?scarica=1`} className="text-slate-900 underline">
+                    Scarica
+                  </a>
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
       <Card title="Domande e spiegazioni" className="mb-6">
         {expense.messages.length === 0 ? (
           <p className="mb-4 text-sm text-slate-500">
@@ -127,13 +187,16 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
 
       <Card title="Modifica" className="mb-6">
         <p className="mb-3 text-sm text-slate-500">
-          Salvando una modifica la spesa torna in attesa: gli altri soci devono approvarla di nuovo.
+          Salvando una modifica (anche solo un allegato aggiunto o tolto) la spesa torna in attesa:
+          gli altri soci devono approvarla di nuovo.
         </p>
         <ActionForm action={editExpense.bind(null, id)} submitLabel="Salva modifiche">
           <ExpenseFields
             categories={categories.filter((c) => c.active || c.id === expense.categoryId)}
             partners={partners.filter((p) => p.active || p.id === expense.paidById)}
             defaults={expense}
+            attachmentRequired={required}
+            attachments={expense.attachments}
           />
         </ActionForm>
       </Card>
