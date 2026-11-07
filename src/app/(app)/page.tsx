@@ -9,7 +9,7 @@ import {
   tdClass,
   thClass,
 } from "@/components/ui";
-import { SettlementList } from "@/components/partner-accounts";
+import { PartiesMissingNotice, SettlementList } from "@/components/partner-accounts";
 import { formatEuro, formatHours, monthName, todayDay } from "@/lib/format";
 import { RECURRENCE_LABEL } from "@/lib/labels";
 import { requirePartner } from "@/lib/session";
@@ -38,7 +38,7 @@ export default async function SummaryPage({
   searchParams: Promise<{ anno?: string }>;
 }) {
   // Anche qui e non solo nel layout: dal menu il layout non viene rifatto.
-  await requirePartner();
+  const me = await requirePartner();
   const params = await searchParams;
   const today = todayDay();
   const year = Number(params.anno) || today.getUTCFullYear();
@@ -222,6 +222,9 @@ export default async function SummaryPage({
         </Card>
 
         <Card title="Chi deve dare cosa a chi (a oggi)">
+          {balances.partiesMissing && (
+            <PartiesMissingNotice missingParties={balances.missingParties} isAdmin={me.isAdmin} />
+          )}
           <SettlementList
             toSettle={settlements(balances.balances)}
             spentCents={balances.spentCents}

@@ -149,6 +149,8 @@ export function partnerBalances(
   // Ci sono spese da dividere tra Parte A e Parte B ma le parti dell'accordo non sono scelte:
   // intanto si dividono secondo le quote.
   partiesMissing: boolean;
+  // Le parti dell'accordo che nessun socio ha ancora (per dire nell'avviso quale manca).
+  missingParties: ("A" | "B")[];
   // Spese (voci, non addebiti) divise secondo le quote dei soci invece che tra le parti.
   byShareCount: number;
 } {
@@ -184,6 +186,9 @@ export function partnerBalances(
     cashCents,
     sharesTotal: sum(partners.map((p) => p.shareBasisPoints)),
     partiesMissing: !hasParties && past.some((c) => c.expense.partyBShareBasisPoints != null),
+    missingParties: (["A", "B"] as const).filter(
+      (role) => !partners.some((p) => p.agreementRole === role),
+    ),
     byShareCount: new Set(
       past
         .filter((c) => !hasParties || c.expense.partyBShareBasisPoints == null)
