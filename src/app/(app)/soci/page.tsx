@@ -13,7 +13,12 @@ import {
   tdClass,
   thClass,
 } from "@/components/ui";
-import { SettlementList, SettlementReasons, roleLabel } from "@/components/partner-accounts";
+import {
+  PartiesMissingNotice,
+  SettlementList,
+  SettlementReasons,
+  roleLabel,
+} from "@/components/partner-accounts";
 import {
   dayInput,
   formatDay,
@@ -91,16 +96,6 @@ export default async function PartnersPage() {
           un socio con Modifica e salva, il programma ricalcola le quote degli altri.
         </Notice>
       )}
-      {summary.partiesMissing && (
-        <Notice>
-          Le spese vanno a carico della Parte B (il piano per lo sviluppo diviso con la Parte A), ma
-          le parti non sono ancora scelte: l&apos;amministratore le sceglie nella pagina{" "}
-          <Link href="/accordo" className="underline">
-            Accordo
-          </Link>
-          . Intanto sono divise secondo le quote per le spese.
-        </Notice>
-      )}
       {!shares && (
         <Notice>
           Nel testo dell&apos;accordo (versione {terms.versionNumber}) non trovo le quote
@@ -138,6 +133,9 @@ export default async function PartnersPage() {
       )}
 
       <Card title="Chi deve dare cosa a chi" className="mb-6">
+        {summary.partiesMissing && (
+          <PartiesMissingNotice missingParties={summary.missingParties} isAdmin={me.isAdmin} />
+        )}
         <SettlementList toSettle={toSettle} spentCents={summary.spentCents} />
         <SettlementReasons balances={summary.balances} />
         {forOthers.length > 0 && (

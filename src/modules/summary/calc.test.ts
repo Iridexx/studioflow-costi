@@ -130,6 +130,37 @@ describe("riepilogo", () => {
     expect(r.partiesMissing).toBe(true);
   });
 
+  it("con la sola Parte A scelta il piano Claude si divide secondo le quote e manca la Parte B", () => {
+    // Il caso reale: Parte A scelta, l'altro socio senza parte e con il 100% delle quote per le spese.
+    const partners = [
+      { id: "a", name: "A", shareBasisPoints: 0, agreementRole: "A" as const },
+      { id: "b", name: "B", shareBasisPoints: 10000 },
+    ];
+    const items = [
+      expense({
+        amountCents: 10052,
+        date: d("2026-05-02"),
+        paidById: "a",
+        partyBShareBasisPoints: 7000,
+      }),
+    ];
+    const r = partnerBalances(partners, items, [], today);
+    expect(r.balances.map((b) => b.dueCents)).toEqual([0, 10052]);
+    expect(r.partiesMissing).toBe(true);
+    expect(r.missingParties).toEqual(["B"]);
+
+    // Scelta la Parte B, il piano Claude torna 30% A e 70% B: B deve 7036 ad A.
+    const withB = partnerBalances(
+      [partners[0], { ...partners[1], agreementRole: "B" as const }],
+      items,
+      [],
+      today,
+    );
+    expect(withB.balances.map((b) => b.dueCents)).toEqual([3016, 7036]);
+    expect(withB.missingParties).toEqual([]);
+    expect(settlements(withB.balances)[0].cents).toBe(7036);
+  });
+
   it("una spesa a carico della Parte B pagata dalla Parte A: B la rimborsa", () => {
     const partners = [
       { id: "a", name: "A", shareBasisPoints: 7000, agreementRole: "A" as const },

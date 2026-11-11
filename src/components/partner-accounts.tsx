@@ -1,4 +1,5 @@
 // Conti tra soci: chi deve dare cosa a chi e perché. Usati nella pagina Soci e nel Riepilogo.
+import Link from "next/link";
 import { formatEuro, formatPercent } from "@/lib/format";
 import type { PartnerBalance, Settlement } from "@/modules/summary/calc";
 
@@ -74,5 +75,39 @@ export function SettlementReasons({ balances }: { balances: PartnerBalance[] }) 
         );
       })}
     </ul>
+  );
+}
+
+// Manca la Parte A o la Parte B dell'accordo: le spese con la loro ripartizione (il piano Claude
+// 70% B e 30% A, le altre tutte alla B) non si possono dividere tra le parti e il programma le
+// divide secondo le quote per le spese. Va detto proprio sopra i conti, che altrimenti sembrano
+// sbagliati senza motivo.
+export function PartiesMissingNotice({
+  missingParties,
+  isAdmin,
+}: {
+  missingParties: ("A" | "B")[];
+  isAdmin: boolean;
+}) {
+  if (missingParties.length === 0) return null;
+  const what =
+    missingParties.length === 2
+      ? "la Parte A e la Parte B dell'accordo non sono ancora scelte"
+      : `manca la Parte ${missingParties[0]} dell'accordo: nessun socio è indicato come Parte ${missingParties[0]}`;
+  return (
+    <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+      <p>
+        <strong>Questi conti non seguono ancora l&apos;accordo:</strong> {what}. Così il piano
+        Claude non si divide 70% Parte B e 30% Parte A e le altre spese non vanno tutte alla Parte
+        B: per ora tutto è diviso secondo le quote per le spese dei soci.
+      </p>
+      <p className="mt-1">
+        {isAdmin ? "Scegli" : "L'amministratore sceglie"} le parti nella pagina{" "}
+        <Link href="/accordo" className="font-medium underline">
+          Accordo → Parti dell&apos;accordo
+        </Link>
+        : i conti si correggono da soli.
+      </p>
+    </div>
   );
 }
