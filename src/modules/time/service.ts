@@ -111,25 +111,26 @@ export async function createTimeEntry(input: TimeEntryInput, createdById: string
   return prisma.timeEntry.findUniqueOrThrow({ where: { id: entry.id } });
 }
 
-// Una modifica rimette le ore in attesa: le confermano di nuovo gli altri soci.
+// Una modifica rimette le ore in attesa: le confermano di nuovo gli altri soci. Si può fare solo
+// su ore ancora in attesa e inserite da chi modifica (vedi rules.ts): il controllo è dentro la
+// stessa transazione, così non passa una modifica su ore confermate un attimo prima.
+export class TimeEntryLockedError extends Error {}
+
 export async function updateTimeEntry(
   id: string,
   input: TimeEntryInput,
   hourlyRateCents: number,
   editorId: string,
 ) {
-  await prisma.$transaction([
-    prisma.timeEntryApproval.deleteMany({ where: { timeEntryId: id } }),
-    prisma.timeEntry.update({
-      where: { id },
-      data: {
-        ...input,
-        hourlyRateCents,
-        approvedAt: null,
-        approvals: { create: { partnerId: editorId } },
-      },
-    }),
-  ]);
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.timeEntry.updateMany({
+      where: { id, approvedAt: null, createdById: editorId },
+      data: { ...input, hourlyRateCents },
+    });
+    if (updated.count === 0) throw new TimeEntryLockedError();
+    await tx.timeEntryApproval.deleteMany({ where: { timeEntryId: id } });
+    await tx.timeEntryApproval.create({ data: { timeEntryId: id, partnerId: editorId } });
+  });
   await settle(id);
 }
 

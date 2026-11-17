@@ -5,6 +5,7 @@ import { Card, Empty, PageTitle, inputClass, tableClass, tdClass, thClass } from
 import { formatDay, formatEuro, formatHours, todayDay } from "@/lib/format";
 import { requirePartner } from "@/lib/session";
 import { listPartners } from "@/modules/partners/service";
+import { editBlock } from "@/modules/time/rules";
 import { listTimeEntriesWithStatus, listTopics } from "@/modules/time/service";
 import { addTimeEntry, confirmTime } from "./actions";
 
@@ -110,6 +111,9 @@ export default async function TimePage({
                   <th className={`${thClass} text-right`}>Ore</th>
                   <th className={`${thClass} text-right`}>Valore</th>
                   <th className={thClass}>Confermate</th>
+                  <th className={thClass}>
+                    <span className="sr-only">Modifica</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -145,13 +149,46 @@ export default async function TimePage({
                         </span>
                       )}
                     </td>
+                    <td className={`${tdClass} text-right whitespace-nowrap`}>
+                      <EditCell entry={e} meId={me.id} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+        {rows.length > 0 && (
+          <p className="mt-3 text-xs text-slate-500">
+            Le ore si possono modificare solo da chi le ha inserite, finché non le hanno confermate
+            tutti i soci. Dopo restano bloccate.
+          </p>
+        )}
       </Card>
     </>
+  );
+}
+
+// Ultima colonna: Modifica sulle proprie ore in attesa, altrimenti perché non si può.
+function EditCell({
+  entry,
+  meId,
+}: {
+  entry: { id: string; createdById: string; approvedAt: Date | null; createdBy: { name: string } };
+  meId: string;
+}) {
+  const block = editBlock(entry, meId);
+  if (block === "confirmed") return <span className="text-xs text-slate-500">🔒 Bloccate</span>;
+  if (block === "not-author")
+    return (
+      <span className="text-xs text-slate-500">può modificarle solo {entry.createdBy.name}</span>
+    );
+  return (
+    <Link
+      href={`/ore/${entry.id}`}
+      className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50"
+    >
+      ✎ Modifica
+    </Link>
   );
 }

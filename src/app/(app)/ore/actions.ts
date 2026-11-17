@@ -7,12 +7,14 @@ import { prisma } from "@/lib/db";
 import { FormError, day, handle, hours, optionalText, requiredText, text } from "@/lib/form";
 import { formatHours } from "@/lib/format";
 import { requirePartner } from "@/lib/session";
+import { editBlock, editBlockMessage } from "@/modules/time/rules";
 import {
   confirmTimeEntry,
   createTimeEntry,
   ensureTopic,
   deleteTimeEntry,
   getTimeEntry,
+  TimeEntryLockedError,
   updateTimeEntry,
   type TimeEntryInput,
 } from "@/modules/time/service";
@@ -59,6 +61,9 @@ export async function editTimeEntry(id: string, _: FormState, form: FormData): P
   return handle(async () => {
     const current = await getTimeEntry(id);
     if (!current) throw new FormError("Registrazione non trovata.");
+    // Solo chi le ha inserite, e solo finché sono in attesa.
+    const block = editBlock(current, me.id);
+    if (block) throw new FormError(editBlockMessage(block, current.createdBy.name));
     const input = await readTimeEntry(form);
     // Cambiando persona si usa il costo orario della nuova persona.
     let rate = current.hourlyRateCents;
@@ -66,7 +71,13 @@ export async function editTimeEntry(id: string, _: FormState, form: FormData): P
       rate = (await prisma.partner.findUniqueOrThrow({ where: { id: input.partnerId } }))
         .hourlyRateCents;
     }
-    await updateTimeEntry(id, input, rate, me.id);
+    try {
+      await updateTimeEntry(id, input, rate, me.id);
+    } catch (error) {
+      if (error instanceof TimeEntryLockedError)
+        throw new FormError(editBlockMessage("confirmed", current.createdBy.name));
+      throw error;
+    }
     revalidatePath("/", "layout");
     redirect("/ore");
   });
