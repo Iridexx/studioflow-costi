@@ -189,12 +189,12 @@ function Test-IsStudioFlow($Process) {
 function Get-StopTarget($Process) {
   $target = $Process
   $current = $Process
-  for ($i = 0; $i -lt 6; $i++) {
+  for ($i = 0; $i -lt 10; $i++) {
     $parent = Get-ProcessInfo $current.ParentProcessId
     if (-not $parent) { break }
+    if (Test-IsServerWindow $parent) { return $parent }
     $commandLine = [string]$parent.CommandLine
-    if ($parent.Name -ieq "cmd.exe" -and $commandLine -match $WindowMarker) { return $parent }
-    if ($parent.Name -ieq "node.exe" -and $commandLine -match "(?i)pnpm") {
+    if ($parent.Name -ieq "node.exe" -and $commandLine -match "(?i)pnpm|corepack|next") {
       $target = $parent
     } elseif ($parent.Name -ine "cmd.exe") {
       break
@@ -204,10 +204,53 @@ function Get-StopTarget($Process) {
   return $target
 }
 
+# Le finestre aperte da questo script per questa porta, anche quelle vecchie rimaste aperte con
+# "command failed with exit code 1" (titolo "StudioFlow-Costi porta ...").
+function Test-IsServerWindow($Process) {
+  if (-not $Process -or $Process.Name -ine "cmd.exe") { return $false }
+  $pattern = "(?i)\btitle\s+" + [regex]::Escape($WindowMarker) + "\s+porta\s+$Porta\b"
+  return ([string]$Process.CommandLine -match $pattern)
+}
+
+# Un "next start" lanciato da questa cartella (anche a mano, o rimasto senza finestra). Mai la
+# build, la modalità sviluppo, la cartella accanto (studioflow e studioflow-costi hanno nomi
+# simili: si confronta il percorso con la barra finale) o i node di altri programmi.
+function Test-IsServerProcess($Process) {
+  if (-not $Process -or $Process.Name -ine "node.exe") { return $false }
+  $commandLine = [string]$Process.CommandLine
+  if ($commandLine.IndexOf($Root.TrimEnd("\") + "\", [StringComparison]::OrdinalIgnoreCase) -lt 0) { return $false }
+  if ($commandLine -notmatch "(?i)[\\/]next[\\/]dist[\\/]bin[\\/]next[`"']?\s+start\b") { return $false }
+  # Un server di prova avviato a mano su un'altra porta resta acceso.
+  if ($commandLine -match "(?i)\s(?:-p|--port)[\s=]+(\d+)") { return ([int]$Matches[1] -eq $Porta) }
+  return $true
+}
+
+# Chiude le finestre e i server vecchi di questa porta, così ne resta sempre uno solo.
+# $KeepId: la finestra (o il processo) del server in funzione da lasciare stare.
+function Close-OldServers([int]$KeepId = 0) {
+  $closed = 0
+  $all = @(Get-CimInstance Win32_Process -Filter "Name = 'cmd.exe' OR Name = 'node.exe'" -ErrorAction SilentlyContinue)
+  $targets = @{}
+  foreach ($process in $all) {
+    if (Test-IsServerWindow $process) { $targets[[int]$process.ProcessId] = $process }
+    elseif (Test-IsServerProcess $process) {
+      $target = Get-StopTarget $process
+      $targets[[int]$target.ProcessId] = $target
+    }
+  }
+  foreach ($id in $targets.Keys) {
+    if ($KeepId -and $id -eq $KeepId) { continue }
+    & taskkill.exe /PID $id /T /F 2>&1 | ForEach-Object { Write-Log "$_" }
+    $closed++
+  }
+  if ($closed -gt 0) { Write-Info ("Chiuse {0} finestre vecchie del server." -f $closed) }
+}
+
 function Stop-StudioFlow($Process) {
   $target = Get-StopTarget $Process
   Write-Info ("Chiudo il processo {0} (PID {1}) e quelli avviati da lui." -f $target.Name, $target.ProcessId)
   & taskkill.exe /PID $target.ProcessId /T /F 2>&1 | ForEach-Object { Write-Log "$_" }
+  Close-OldServers
   for ($i = 0; $i -lt 30; $i++) {
     if (-not (Get-PortOwner)) { return $true }
     Start-Sleep -Milliseconds 500
@@ -216,11 +259,14 @@ function Stop-StudioFlow($Process) {
 }
 
 function Start-StudioFlow([string]$Slot) {
-  # La finestra resta aperta (ridotta a icona) con i messaggi del server; il titolo serve a
-  # ritrovarla al prossimo aggiornamento.
+  # Prima si chiudono le finestre vecchie: con la porta occupata la nuova fallirebbe e resterebbe
+  # aperta. Se il server si ferma, la finestra lo dice e si chiude da sola dopo un minuto.
+  Close-OldServers
+  for ($i = 0; $i -lt 20 -and (Get-PortOwner); $i++) { Start-Sleep -Milliseconds 500 }
   $env:STUDIOFLOW_DIST_DIR = $Slot
-  $commandLine = "title $WindowMarker porta $Porta & pnpm exec next start -p $Porta"
-  Start-Process -FilePath "cmd.exe" -ArgumentList "/k", $commandLine -WorkingDirectory $Root -WindowStyle Minimized
+  $onExit = "(echo. & echo Il server si e' fermato: questa finestra si chiude da sola tra un minuto. & timeout /t 60 /nobreak >nul)"
+  $commandLine = "title $WindowMarker porta $Porta & pnpm exec next start -p $Porta || $onExit"
+  Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $commandLine -WorkingDirectory $Root -WindowStyle Minimized
   Write-Log "Avviato: $commandLine (STUDIOFLOW_DIST_DIR=$Slot)"
 }
 
@@ -451,6 +497,7 @@ if ($SoloControllo) {
 
 if (-not $needsBuild) {
   if ($running) {
+    Close-OldServers ([int](Get-StopTarget $owner).ProcessId)
     Write-Host ""
     Write-Host "Nessuna novità: StudioFlow Costi è già aggiornato e in funzione." -ForegroundColor Green
     exit 0
