@@ -76,7 +76,7 @@ database: `studioflow_costi`).
 
 Poi doppio clic su **`aggiorna-costi.bat`**: installa, prepara il database e avvia il programma
 sulla porta **3100** (finestra "StudioFlow-Costi" ridotta a icona: se la chiudi il programma si
-ferma). Al primo accesso da http://localhost:3100 si crea l'utente amministratore; da
+ferma; a ogni avvio le finestre vecchie si chiudono da sole, così ne resta una sola). Al primo accesso da http://localhost:3100 si crea l'utente amministratore; da
 **Soci e versamenti** si aggiunge il socio.
 
 ### Aggiungere un socio
