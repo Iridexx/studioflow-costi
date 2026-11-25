@@ -194,7 +194,9 @@ function Get-StopTarget($Process) {
     if (-not $parent) { break }
     if (Test-IsServerWindow $parent) { return $parent }
     $commandLine = [string]$parent.CommandLine
-    if ($parent.Name -ieq "node.exe" -and $commandLine -match "(?i)pnpm|corepack|next") {
+    # pnpm recenti sono un pnpm.exe e non un node.exe: senza questo la risalita si fermava prima
+    # della finestra e "Nessuna novità" chiudeva proprio il server in funzione.
+    if ($parent.Name -ieq "pnpm.exe" -or ($parent.Name -ieq "node.exe" -and $commandLine -match "(?i)pnpm|corepack|next")) {
       $target = $parent
     } elseif ($parent.Name -ine "cmd.exe") {
       break
@@ -265,7 +267,9 @@ function Start-StudioFlow([string]$Slot) {
   for ($i = 0; $i -lt 20 -and (Get-PortOwner); $i++) { Start-Sleep -Milliseconds 500 }
   $env:STUDIOFLOW_DIST_DIR = $Slot
   $onExit = "(echo. & echo Il server si e' fermato: questa finestra si chiude da sola tra un minuto. & timeout /t 60 /nobreak >nul)"
-  $commandLine = "title $WindowMarker porta $Porta & pnpm exec next start -p $Porta || $onExit"
+  # Next.js parte direttamente, senza passare da pnpm: il pnpm installato sul PC può bloccarsi
+  # mentre passa alla versione del progetto e il server non partirebbe mai.
+  $commandLine = "title $WindowMarker porta $Porta & node_modules\.bin\next.cmd start -p $Porta || $onExit"
   Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $commandLine -WorkingDirectory $Root -WindowStyle Minimized
   Write-Log "Avviato: $commandLine (STUDIOFLOW_DIST_DIR=$Slot)"
 }
